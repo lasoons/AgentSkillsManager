@@ -120,11 +120,6 @@
                     "group": "navigation@3"
                 },
                 {
-                    "command": "agentskills.sync",
-                    "when": "view == agentskills-skills",
-                    "group": "navigation@4"
-                },
-                {
                     "command": "agentskills.refresh",
                     "when": "view == agentskills-skills",
                     "group": "navigation@5"
@@ -133,12 +128,12 @@
             "view/item/context": [
                 {
                     "command": "agentskills.pullRepo",
-                    "when": "viewItem == skillRepo",
+                    "when": "viewItem == skillRepo || viewItem == skillRepoPreset",
                     "group": "inline"
                 },
                 {
                     "command": "agentskills.switchBranch",
-                    "when": "viewItem == skillRepo",
+                    "when": "viewItem == skillRepo || viewItem == skillRepoPreset",
                     "group": "inline"
                 },
                 {

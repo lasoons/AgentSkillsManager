@@ -11,6 +11,7 @@ export interface SkillRepo {
     url: string;
     name: string; // User friendly name or derived from URL
     branch?: string;
+    isPreset?: boolean; // Whether this is a preset (built-in) repository
 }
 
 export interface SyncResult {

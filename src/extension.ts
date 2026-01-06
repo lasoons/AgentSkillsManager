@@ -40,6 +40,16 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(skillsTreeView);
 
+    // Auto-pull preset repositories on activation
+    vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: 'Initializing preset skills repositories...',
+        cancellable: false
+    }, async () => {
+        await ConfigManager.ensurePresetRepos();
+        skillsProvider.refresh();
+    });
+
     skillsTreeView.onDidChangeCheckboxState(e => {
         e.items.forEach(([item, state]) => {
             if (!('url' in item)) {
@@ -178,12 +188,15 @@ export function activate(context: vscode.ExtensionContext) {
 
             skillsProvider.refresh();
 
-            const syncNow = await vscode.window.showInformationMessage(
-                `Installed ${selected.length} skill(s). Sync AGENTS.md now?`,
-                'Yes', 'No'
-            );
-            if (syncNow === 'Yes') {
-                vscode.commands.executeCommand('agentskills.sync');
+            // Auto sync after install
+            const { syncToAgentsMd } = await import('./services/sync');
+            const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
+            const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
+
+            if (result.success) {
+                vscode.window.showInformationMessage(`Installed ${selected.length} skill(s) and synced.`);
+            } else {
+                vscode.window.showWarningMessage(`Installed ${selected.length} skill(s), but sync failed: ${result.message}`);
             }
         }),
 
