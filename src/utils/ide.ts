@@ -19,7 +19,7 @@ const DEFAULT_AGENTS_MD_CONTENT = '# AGENTS\n\nInsert overview text here. The ag
 export const IDE_CONFIGS: Record<IdeType, IdeConfig> = {
     [IdeType.ANTIGRAVITY]: {
         type: IdeType.ANTIGRAVITY,
-        rulesFile: join('.agent', 'rules', 'openskills.md'),
+        rulesFile: join('.agent', 'rules', 'agentskills.md'),
         initialContent: `---
 trigger: always_on
 ---
@@ -29,7 +29,7 @@ Insert overview text here. The agent will only see this should they choose to ap
     },
     [IdeType.CURSOR]: {
         type: IdeType.CURSOR,
-        rulesFile: join('.cursor', 'rules', 'openskills.mdc'),
+        rulesFile: join('.cursor', 'rules', 'agentskills.mdc'),
         initialContent: `---
 alwaysApply: true
 ---
@@ -39,7 +39,7 @@ Insert overview text here. The agent will only see this should they choose to ap
     },
     [IdeType.WINDSURF]: {
         type: IdeType.WINDSURF,
-        rulesFile: join('.windsurf', 'rules', 'openskills.md'),
+        rulesFile: join('.windsurf', 'rules', 'agentskills.md'),
         initialContent: `---
 trigger: manual
 ---
@@ -49,7 +49,7 @@ Insert overview text here. The agent will only see this should they choose to ap
     },
     [IdeType.TRAE]: {
         type: IdeType.TRAE,
-        rulesFile: join('.trae', 'rules', 'openskills.md'),
+        rulesFile: join('.trae', 'rules', 'agentskills.md'),
         initialContent: `---
 alwaysApply: true
 ---
@@ -80,8 +80,8 @@ export function resolveIdeType(appName: string): IdeType {
  */
 export function detectIde(env: NodeJS.ProcessEnv = process.env): IdeType {
     // Check explicit override first
-    if (env.OPENSKILLS_IDE) {
-        const override = env.OPENSKILLS_IDE.toLowerCase();
+    if (env.AGENTSKILLS_IDE) {
+        const override = env.AGENTSKILLS_IDE.toLowerCase();
         if (Object.values(IdeType).includes(override as IdeType)) {
             return override as IdeType;
         }

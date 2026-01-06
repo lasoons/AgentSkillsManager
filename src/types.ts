@@ -19,3 +19,13 @@ export interface SyncResult {
     message: string;
     count: number;
 }
+
+/**
+ * Represents an installed skill (in project or global directory)
+ */
+export interface InstalledSkill {
+    name: string;
+    description: string;
+    location: 'project' | 'global';
+    path: string;
+}

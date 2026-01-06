@@ -41,10 +41,10 @@ Skills are installed to `.agent/skills/<skill-name>/` in your workspace.
 
 The sync target depends on your IDE:
 - **VSCode**: `AGENTS.md`
-- **Cursor**: `.cursor/rules/openskills.mdc`
-- **Windsurf**: `.windsurf/rules/openskills.md`
-- **Trae**: `.trae/rules/openskills.md`
-- **Antigravity**: `.agent/rules/openskills.md`
+- **Cursor**: `.cursor/rules/agentskills.mdc`
+- **Windsurf**: `.windsurf/rules/agentskills.md`
+- **Trae**: `.trae/rules/agentskills.md`
+- **Antigravity**: `.agent/rules/agentskills.md`
 
 ## License
 

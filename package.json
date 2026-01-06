@@ -128,12 +128,12 @@
             "view/item/context": [
                 {
                     "command": "agentskills.pullRepo",
-                    "when": "viewItem == skillRepo || viewItem == skillRepoPreset",
+                    "when": "viewItem == skillRepo",
                     "group": "inline"
                 },
                 {
                     "command": "agentskills.switchBranch",
-                    "when": "viewItem == skillRepo || viewItem == skillRepoPreset",
+                    "when": "viewItem == skillRepo",
                     "group": "inline"
                 },
                 {

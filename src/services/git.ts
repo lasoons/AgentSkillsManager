@@ -5,7 +5,7 @@ import * as os from 'os';
 import { Skill } from '../types';
 import { scanSkillsFromDir, getRepoCachePath } from './skillScanner';
 
-const CACHE_DIR = path.join(os.tmpdir(), 'openskills-vscode-cache');
+const CACHE_DIR = path.join(os.tmpdir(), 'agentskills-git-cache');
 
 // Ensure cache directory exists
 if (!fs.existsSync(CACHE_DIR)) {

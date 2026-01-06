@@ -86,9 +86,8 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
 
     getTreeItem(element: SkillRepo | Skill): vscode.TreeItem {
         if ('url' in element) {
-            const displayName = element.isPreset ? ` ${element.name}` : element.name;
-            const item = new vscode.TreeItem(displayName, vscode.TreeItemCollapsibleState.Collapsed);
-            item.contextValue = element.isPreset ? 'skillRepoPreset' : 'skillRepo';
+            const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.Collapsed);
+            item.contextValue = 'skillRepo';
             item.description = element.branch ? `[${element.branch}]` : '';
             item.tooltip = element.url;
             item.iconPath = new vscode.ThemeIcon('repo');

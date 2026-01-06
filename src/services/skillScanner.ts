@@ -4,7 +4,7 @@ import * as os from 'os';
 import { Skill } from '../types';
 import { extractYamlField, hasValidFrontmatter } from '../utils/yaml';
 
-const CACHE_DIR = path.join(os.tmpdir(), 'openskills-vscode-cache');
+const CACHE_DIR = path.join(os.tmpdir(), 'agentskills-git-cache');
 
 /**
  * Scan skills from a local directory
