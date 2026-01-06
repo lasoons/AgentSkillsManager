@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigManager } from './configManager';
-import { GitUtils } from './gitUtils';
+import { GitService } from './services/git';
 import { Skill, SkillRepo } from './types';
 import { getIdeConfig } from './utils/ide';
 
@@ -23,7 +23,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
         const key = this.getSkillKey(skill);
         if (checked) {
             this.checkedSkills.add(key);
-            // Ensure cache has the latest skill object (handled in getChildren usually, but good to have)
             this.skillCache.set(key, skill);
         } else {
             this.checkedSkills.delete(key);
@@ -33,8 +32,9 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
     getCheckedSkills(): Skill[] {
         const result: Skill[] = [];
         for (const key of this.checkedSkills) {
-            if (this.skillCache.has(key)) {
-                result.push(this.skillCache.get(key)!);
+            const skill = this.skillCache.get(key);
+            if (skill) {
+                result.push(skill);
             }
         }
         return result;
@@ -55,14 +55,12 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
 
     private getInstalledSkillsDir(): string | undefined {
         const root = this.getWorkspaceRoot();
-        if (!root) return undefined;
-        return path.join(root, '.agent', 'skills');
+        return root ? path.join(root, '.agent', 'skills') : undefined;
     }
 
     private isSkillInstalled(skillName: string): boolean {
         const dir = this.getInstalledSkillsDir();
-        if (!dir) return false;
-        return fs.existsSync(path.join(dir, skillName, 'SKILL.md'));
+        return dir ? fs.existsSync(path.join(dir, skillName, 'SKILL.md')) : false;
     }
 
     private updateSyncedSkillsCache(): void {
@@ -70,14 +68,11 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
         const root = this.getWorkspaceRoot();
         if (!root) return;
 
-        if (!root) return;
-
         const config = getIdeConfig(vscode.env.appName);
         const agentsPath = path.join(root, config.rulesFile);
         if (!fs.existsSync(agentsPath)) return;
 
         const content = fs.readFileSync(agentsPath, 'utf-8');
-        // Parse skill names from <name>xxx</name> tags
         const regex = /<name>([^<]+)<\/name>/g;
         let match;
         while ((match = regex.exec(content)) !== null) {
@@ -91,7 +86,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
 
     getTreeItem(element: SkillRepo | Skill): vscode.TreeItem {
         if ('url' in element) {
-            // It's a Repo
             const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.Collapsed);
             item.contextValue = 'skillRepo';
             item.description = element.branch ? `[${element.branch}]` : '';
@@ -99,12 +93,10 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
             item.iconPath = new vscode.ThemeIcon('repo');
             return item;
         } else {
-            // It's a Skill
             const installed = this.isSkillInstalled(element.name);
             const synced = this.isSkillSynced(element.name);
             const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.None);
 
-            // Build status string
             const status: string[] = [];
             if (installed) status.push('Installed');
             if (synced) status.push('Synced');
@@ -113,7 +105,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
             item.description = status.length > 0 ? `[${status.join(', ')}]` : element.description;
             item.tooltip = `${element.name}\n${element.description}\n${element.path}`;
 
-            // Icon based on status
             let iconName = 'tools';
             if (installed && synced) {
                 iconName = 'pass-filled';
@@ -133,17 +124,13 @@ export class SkillsProvider implements vscode.TreeDataProvider<SkillRepo | Skill
 
     async getChildren(element?: SkillRepo | Skill): Promise<(SkillRepo | Skill)[]> {
         if (!element) {
-            // Root: return repos
             this.updateSyncedSkillsCache();
-            // Clear skill cache on full refresh? Maybe not, incremental is fine.
             return ConfigManager.getRepos();
         } else if ('url' in element) {
-            // Repo: return skills
             try {
-                const skills = await GitUtils.getSkillsFromRepo(element.url, element.branch);
+                const skills = await GitService.getSkillsFromRepo(element.url, element.branch);
                 skills.forEach(s => {
                     s.installed = this.isSkillInstalled(s.name);
-                    // Update cache
                     this.skillCache.set(this.getSkillKey(s), s);
                 });
                 return skills;

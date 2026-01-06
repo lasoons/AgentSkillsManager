@@ -2,3 +2,7 @@ out
 node_modules
 .vscode-test
 *.vsix
+.agent/*
+.cursor/*
+.trae/*
+.windsurf/*

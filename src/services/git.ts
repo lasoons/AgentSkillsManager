@@ -2,19 +2,19 @@ import * as cp from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Skill } from './types';
-import { extractYamlField, hasValidFrontmatter } from './utils/yaml';
+import { Skill } from '../types';
+import { scanSkillsFromDir, getRepoCachePath } from './skillScanner';
 
 const CACHE_DIR = path.join(os.tmpdir(), 'openskills-vscode-cache');
 
+// Ensure cache directory exists
 if (!fs.existsSync(CACHE_DIR)) {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
 }
 
-export class GitUtils {
+export class GitService {
     static getRepoPath(url: string): string {
-        const dirName = Buffer.from(url).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
-        return path.join(CACHE_DIR, dirName);
+        return getRepoCachePath(url);
     }
 
     static isRepoCloned(url: string): boolean {
@@ -37,7 +37,6 @@ export class GitUtils {
         }
     }
 
-    // Only clone if not exists, no pull
     static async ensureRepoCloned(url: string, branch?: string): Promise<string> {
         const repoPath = this.getRepoPath(url);
 
@@ -55,7 +54,6 @@ export class GitUtils {
         return repoPath;
     }
 
-    // Explicit pull operation
     static async pullRepo(url: string, branch?: string): Promise<void> {
         const repoPath = this.getRepoPath(url);
 
@@ -73,52 +71,9 @@ export class GitUtils {
         }
     }
 
-    // Scan skills from local cache only
-    static scanSkillsFromCache(url: string): Skill[] {
-        const repoPath = this.getRepoPath(url);
-        const skills: Skill[] = [];
-
-        if (!fs.existsSync(repoPath)) {
-            return skills;
-        }
-
-        const findSkills = (dir: string) => {
-            try {
-                const entries = fs.readdirSync(dir, { withFileTypes: true });
-                for (const entry of entries) {
-                    if (entry.name.startsWith('.')) continue;
-
-                    const fullPath = path.join(dir, entry.name);
-                    if (entry.isDirectory()) {
-                        if (fs.existsSync(path.join(fullPath, 'SKILL.md'))) {
-                            const content = fs.readFileSync(path.join(fullPath, 'SKILL.md'), 'utf-8');
-                            if (hasValidFrontmatter(content)) {
-                                skills.push({
-                                    name: extractYamlField(content, 'name') || entry.name,
-                                    description: extractYamlField(content, 'description'),
-                                    path: path.relative(repoPath, fullPath).replace(/\\/g, '/'),
-                                    repoUrl: url,
-                                    localPath: fullPath
-                                });
-                            }
-                        } else {
-                            findSkills(fullPath);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error(`Error scanning dir ${dir}`, e);
-            }
-        };
-
-        findSkills(repoPath);
-        return skills;
-    }
-
-    // Clone if needed, then scan (for initial load)
     static async getSkillsFromRepo(url: string, branch?: string): Promise<Skill[]> {
-        await this.ensureRepoCloned(url, branch);
-        return this.scanSkillsFromCache(url);
+        const repoPath = await this.ensureRepoCloned(url, branch);
+        return scanSkillsFromDir(repoPath, url);
     }
 
     private static execGitOutput(args: string[]): Promise<string> {

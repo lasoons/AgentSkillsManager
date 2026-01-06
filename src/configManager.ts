@@ -3,12 +3,12 @@ import { SkillRepo } from './types';
 
 export class ConfigManager {
     static getRepos(): SkillRepo[] {
-        const config = vscode.workspace.getConfiguration('openskills');
+        const config = vscode.workspace.getConfiguration('agentskills');
         return config.get<SkillRepo[]>('repositories') || [];
     }
 
     static async addRepo(url: string) {
-        const config = vscode.workspace.getConfiguration('openskills');
+        const config = vscode.workspace.getConfiguration('agentskills');
         const repos = this.getRepos();
         if (repos.some(r => r.url === url)) {
             return;
@@ -21,7 +21,7 @@ export class ConfigManager {
     }
 
     static async updateRepo(url: string, updates: Partial<SkillRepo>) {
-        const config = vscode.workspace.getConfiguration('openskills');
+        const config = vscode.workspace.getConfiguration('agentskills');
         let repos = this.getRepos();
         const index = repos.findIndex(r => r.url === url);
         if (index !== -1) {
@@ -31,7 +31,7 @@ export class ConfigManager {
     }
 
     static async removeRepo(url: string) {
-        const config = vscode.workspace.getConfiguration('openskills');
+        const config = vscode.workspace.getConfiguration('agentskills');
         let repos = this.getRepos();
         repos = repos.filter(r => r.url !== url);
         await config.update('repositories', repos, vscode.ConfigurationTarget.Global);

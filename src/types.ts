@@ -12,3 +12,9 @@ export interface SkillRepo {
     name: string; // User friendly name or derived from URL
     branch?: string;
 }
+
+export interface SyncResult {
+    success: boolean;
+    message: string;
+    count: number;
+}

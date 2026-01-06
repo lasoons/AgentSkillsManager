@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as cp from 'child_process';
 import { SkillsProvider } from './skillsProvider';
 import { ConfigManager } from './configManager';
-import { GitUtils } from './gitUtils';
+import { GitService } from './services/git';
 import { Skill, SkillRepo } from './types';
+import { copyRecursiveSync } from './utils/fs';
 
 let skillsTreeView: vscode.TreeView<SkillRepo | Skill>;
 
@@ -13,7 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
     const skillsProvider = new SkillsProvider();
 
     // Create Output Channel
-    const outputChannel = vscode.window.createOutputChannel('OpenSkills');
+    const outputChannel = vscode.window.createOutputChannel('Agent Skills Manager');
 
     // Patch console to redirect to Output Channel
     const originalLog = console.log;
@@ -31,9 +31,9 @@ export function activate(context: vscode.ExtensionContext) {
         originalError.apply(console, args);
     };
 
-    outputChannel.appendLine('OpenSkills extension activated');
+    outputChannel.appendLine('Agent Skills Manager extension activated');
 
-    skillsTreeView = vscode.window.createTreeView('openskills-skills', {
+    skillsTreeView = vscode.window.createTreeView('agentskills-skills', {
         treeDataProvider: skillsProvider,
         canSelectMany: true
     });
@@ -49,9 +49,9 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('openskills.refresh', () => skillsProvider.refresh()),
+        vscode.commands.registerCommand('agentskills.refresh', () => skillsProvider.refresh()),
 
-        vscode.commands.registerCommand('openskills.addRepo', async () => {
+        vscode.commands.registerCommand('agentskills.addRepo', async () => {
             const url = await vscode.window.showInputBox({
                 placeHolder: 'Enter Git Repository URL (e.g., https://github.com/anthropics/skills)',
                 prompt: 'Add a new Skill Repository'
@@ -68,7 +68,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('openskills.removeRepo', async (node: SkillRepo) => {
+        vscode.commands.registerCommand('agentskills.removeRepo', async (node: SkillRepo) => {
             const result = await vscode.window.showWarningMessage(`Remove repository ${node.name}?`, 'Yes', 'No');
             if (result === 'Yes') {
                 await ConfigManager.removeRepo(node.url);
@@ -76,13 +76,13 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('openskills.switchBranch', async (node: SkillRepo) => {
+        vscode.commands.registerCommand('agentskills.switchBranch', async (node: SkillRepo) => {
             const branches = await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: 'Fetching branches...',
                 cancellable: false
             }, async () => {
-                return await GitUtils.getRemoteBranches(node.url);
+                return await GitService.getRemoteBranches(node.url);
             });
 
             if (branches.length === 0) {
@@ -100,19 +100,19 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('openskills.pullRepo', async (node: SkillRepo) => {
+        vscode.commands.registerCommand('agentskills.pullRepo', async (node: SkillRepo) => {
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: `Pulling ${node.name}...`,
                 cancellable: false
             }, async () => {
-                await GitUtils.pullRepo(node.url, node.branch);
+                await GitService.pullRepo(node.url, node.branch);
             });
             skillsProvider.refresh();
             vscode.window.showInformationMessage(`${node.name} updated.`);
         }),
 
-        vscode.commands.registerCommand('openskills.sync', async () => {
+        vscode.commands.registerCommand('agentskills.sync', async () => {
             if (!vscode.workspace.workspaceFolders) {
                 vscode.window.showErrorMessage('Please open a workspace folder first.');
                 return;
@@ -125,7 +125,7 @@ export function activate(context: vscode.ExtensionContext) {
             }, async () => {
                 outputChannel.show();
                 console.log(`Starting sync process... IDE: ${vscode.env.appName}`);
-                const { syncToAgentsMd } = await import('./syncUtils');
+                const { syncToAgentsMd } = await import('./services/sync');
                 const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
                 const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
 
@@ -137,7 +137,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
         }),
 
-        vscode.commands.registerCommand('openskills.installSelected', async () => {
+        vscode.commands.registerCommand('agentskills.installSelected', async () => {
             const checked = skillsProvider.getCheckedSkills();
             const selected = checked.length > 0
                 ? checked
@@ -183,11 +183,11 @@ export function activate(context: vscode.ExtensionContext) {
                 'Yes', 'No'
             );
             if (syncNow === 'Yes') {
-                vscode.commands.executeCommand('openskills.sync');
+                vscode.commands.executeCommand('agentskills.sync');
             }
         }),
 
-        vscode.commands.registerCommand('openskills.deleteSelected', async () => {
+        vscode.commands.registerCommand('agentskills.deleteSelected', async () => {
             const checked = skillsProvider.getCheckedSkills();
             const selected = checked.length > 0
                 ? checked
@@ -225,23 +225,4 @@ export function activate(context: vscode.ExtensionContext) {
     );
 }
 
-function copyRecursiveSync(src: string, dest: string) {
-    const exists = fs.existsSync(src);
-    const stats = exists && fs.statSync(src);
-    const isDirectory = stats && stats.isDirectory();
-    if (isDirectory) {
-        if (fs.existsSync(dest)) {
-            fs.rmSync(dest, { recursive: true, force: true });
-        }
-        fs.mkdirSync(dest, { recursive: true });
-        fs.readdirSync(src).forEach((childItemName) => {
-            copyRecursiveSync(path.join(src, childItemName), path.join(dest, childItemName));
-        });
-    } else {
-        fs.copyFileSync(src, dest);
-    }
-}
-
-export function deactivate() {
-    // Restore console? (Optional, as extension host is dying anyway)
-}
+export function deactivate() { }

@@ -67,8 +67,6 @@ Insert overview text here. The agent will only see this should they choose to ap
 export function resolveIdeType(appName: string): IdeType {
     const lowerAppName = appName.toLowerCase();
 
-    console.log(`[DEBUG] resolveIdeType: Resolving '${appName}' caused by '${lowerAppName}'`);
-
     if (lowerAppName.includes('cursor')) return IdeType.CURSOR;
     if (lowerAppName.includes('windsurf')) return IdeType.WINDSURF;
     if (lowerAppName.includes('trae')) return IdeType.TRAE;
@@ -91,34 +89,15 @@ export function detectIde(env: NodeJS.ProcessEnv = process.env): IdeType {
 
     // Check VSCODE_ENV_APPNAME
     const appName = env.VSCODE_ENV_APPNAME || env.PROG_IDE_NAME || '';
-
-    console.log('[DEBUG] Detecting IDE from Env...');
-    console.log(`[DEBUG] OPENSKILLS_IDE: ${env.OPENSKILLS_IDE}`);
-    console.log(`[DEBUG] VSCODE_ENV_APPNAME: ${env.VSCODE_ENV_APPNAME}`);
-    console.log(`[DEBUG] PROG_IDE_NAME: ${env.PROG_IDE_NAME}`);
-    console.log(`[DEBUG] Detected appName: ${appName}`);
-
-    const resolved = resolveIdeType(appName);
-    if (resolved === IdeType.VSCODE && !appName) {
-        console.log('[DEBUG] No specific IDE matched, defaulting to VSCODE');
-    }
-    return resolved;
+    return resolveIdeType(appName);
 }
 
 /**
  * Get configuration for a specific IDE or the detected one.
  */
 export function getIdeConfig(ide: IdeType | string): IdeConfig {
-    let ideType: IdeType;
-
-    if (Object.values(IdeType).includes(ide as IdeType)) {
-        ideType = ide as IdeType;
-    } else {
-        // Try fuzzy match for raw strings (e.g. "Visual Studio Code" or "Cursor")
-        console.log(`[DEBUG] getIdeConfig: performing fuzzy match for '${ide}'`);
-        ideType = resolveIdeType(ide);
-    }
-
-    console.log(`[DEBUG] getIdeConfig: resolved to '${ideType}'`);
+    const ideType = Object.values(IdeType).includes(ide as IdeType)
+        ? ide as IdeType
+        : resolveIdeType(ide);
     return IDE_CONFIGS[ideType];
 }
