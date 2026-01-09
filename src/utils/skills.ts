@@ -5,16 +5,73 @@ import { InstalledSkill } from '../types';
 import { extractYamlField } from './yaml';
 
 /**
+ * Represents a skill directory with metadata
+ */
+export interface SkillDirectory {
+    path: string;
+    displayName: string;
+    isProject: boolean;
+    icon: string;
+}
+
+/**
+ * Get all skill directories with metadata
+ */
+export function getSkillDirectories(workspaceRoot: string): SkillDirectory[] {
+    return [
+        // Project-level directories
+        {
+            path: path.join(workspaceRoot, '.agent', 'skills'),
+            displayName: '.agent/skills',
+            isProject: true,
+            icon: 'folder'
+        },
+        {
+            path: path.join(workspaceRoot, '.cursor', 'skills'),
+            displayName: '.cursor/skills',
+            isProject: true,
+            icon: 'folder'
+        },
+        {
+            path: path.join(workspaceRoot, '.trae', 'skills'),
+            displayName: '.trae/skills',
+            isProject: true,
+            icon: 'folder'
+        },
+        {
+            path: path.join(workspaceRoot, '.windsurf', 'skills'),
+            displayName: '.windsurf/skills',
+            isProject: true,
+            icon: 'folder'
+        },
+        // Global directories
+        {
+            path: path.join(os.homedir(), '.agent', 'skills'),
+            displayName: '~/.agent/skills',
+            isProject: false,
+            icon: 'home'
+        },
+        {
+            path: path.join(os.homedir(), '.codex', 'skills'),
+            displayName: '~/.codex/skills',
+            isProject: false,
+            icon: 'home'
+        },
+        {
+            path: path.join(os.homedir(), '.claude', 'skills'),
+            displayName: '~/.claude/skills',
+            isProject: false,
+            icon: 'home'
+        },
+    ];
+}
+
+/**
  * Get all searchable skill directories in priority order
  * Priority: project .agent > global .agent > project .claude > global .claude
  */
 export function getSearchDirs(workspaceRoot: string): string[] {
-    return [
-        path.join(workspaceRoot, '.agent', 'skills'),   // 1. Project universal (.agent)
-        path.join(os.homedir(), '.agent', 'skills'),    // 2. Global universal (.agent)
-        path.join(workspaceRoot, '.claude', 'skills'),  // 3. Project claude
-        path.join(os.homedir(), '.claude', 'skills'),   // 4. Global claude
-    ];
+    return getSkillDirectories(workspaceRoot).map(d => d.path);
 }
 
 /**
@@ -66,6 +123,9 @@ export function findAllInstalledSkills(workspaceRoot: string): InstalledSkill[] 
                             description: extractYamlField(content, 'description'),
                             location: isProjectLocal ? 'project' : 'global',
                             path: path.join(dir, entry.name),
+                            explicitLocation: isProjectLocal
+                                ? path.relative(workspaceRoot, skillPath).replace(/\\/g, '/')
+                                : undefined
                         });
 
                         seen.add(entry.name);

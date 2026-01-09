@@ -2,11 +2,11 @@
     "name": "agent-skills-manager",
     "displayName": "AgentSkillsManager",
     "description": "Manage, install, and sync Agent Skills (Claude Code compatible skills) from VSCode.",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "publisher": "whyuds",
     "repository": {
         "type": "git",
-        "url": "https://github.com/whyuds/AgentSkillsManager"
+        "url": "https://github.com/lasoons/AgentSkillsManager"
     },
     "license": "MIT",
     "icon": "resources/skills-logo.png",
@@ -83,6 +83,31 @@
                 "command": "agentskills.pullRepo",
                 "title": "Pull Latest",
                 "icon": "$(repo-sync)"
+            },
+            {
+                "command": "agentskills.deleteLocalSkill",
+                "title": "Delete Skill",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "agentskills.openLocalSkill",
+                "title": "Open SKILL.md",
+                "icon": "$(go-to-file)"
+            },
+            {
+                "command": "agentskills.installSkill",
+                "title": "Install Skill",
+                "icon": "$(cloud-download)"
+            },
+            {
+                "command": "agentskills.deleteSkill",
+                "title": "Delete Skill",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "agentskills.syncToCurrentIde",
+                "title": "Sync to Current IDE",
+                "icon": "$(sync)"
             }
         ],
         "viewsContainers": {
@@ -139,6 +164,31 @@
                 {
                     "command": "agentskills.removeRepo",
                     "when": "viewItem == skillRepo",
+                    "group": "inline"
+                },
+                {
+                    "command": "agentskills.openLocalSkill",
+                    "when": "viewItem == localSkill",
+                    "group": "inline"
+                },
+                {
+                    "command": "agentskills.deleteLocalSkill",
+                    "when": "viewItem == localSkill",
+                    "group": "inline"
+                },
+                {
+                    "command": "agentskills.installSkill",
+                    "when": "viewItem == skill",
+                    "group": "inline"
+                },
+                {
+                    "command": "agentskills.deleteSkill",
+                    "when": "viewItem == skillInstalled",
+                    "group": "inline"
+                },
+                {
+                    "command": "agentskills.syncToCurrentIde",
+                    "when": "viewItem == localSkillsGroupNeedsSync",
                     "group": "inline"
                 }
             ]

@@ -7,6 +7,8 @@ src/
 tsconfig.json
 *.map
 .gitignore
-**/*.md
-!LICENSE.md
+# Avoid ignoring essential markdown files
+!README.md
+!CHANGELOG.md
+!**/SKILL.md
 esbuild.js

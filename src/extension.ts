@@ -4,10 +4,11 @@ import * as fs from 'fs';
 import { SkillsProvider } from './skillsProvider';
 import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
-import { Skill, SkillRepo } from './types';
+import { Skill, SkillRepo, LocalSkill } from './types';
 import { copyRecursiveSync } from './utils/fs';
 
-let skillsTreeView: vscode.TreeView<SkillRepo | Skill>;
+type TreeNode = SkillRepo | Skill | { type: string; name: string; path: string };
+let skillsTreeView: vscode.TreeView<TreeNode>;
 
 export function activate(context: vscode.ExtensionContext) {
     const skillsProvider = new SkillsProvider();
@@ -52,7 +53,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     skillsTreeView.onDidChangeCheckboxState(e => {
         e.items.forEach(([item, state]) => {
-            if (!('url' in item)) {
+            // Only handle repo skills (have repoUrl, not local skills)
+            if ('repoUrl' in item) {
                 skillsProvider.setChecked(item as Skill, state === vscode.TreeItemCheckboxState.Checked);
             }
         });
@@ -234,8 +236,163 @@ export function activate(context: vscode.ExtensionContext) {
 
             skillsProvider.refresh();
             vscode.window.showInformationMessage(`Deleted ${selected.length} skill(s).`);
+        }),
+
+        vscode.commands.registerCommand('agentskills.installSkill', async (node: Skill) => {
+            if (!node || !('repoUrl' in node)) {
+                vscode.window.showErrorMessage('Please select a skill to install.');
+                return;
+            }
+
+            if (!vscode.workspace.workspaceFolders) {
+                vscode.window.showErrorMessage('Please open a workspace folder first.');
+                return;
+            }
+
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `Installing ${node.name}...`,
+                cancellable: false
+            }, async () => {
+                const targetBase = path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, '.agent', 'skills');
+                const targetDir = path.join(targetBase, node.name);
+
+                if (!node.localPath || !fs.existsSync(node.localPath)) {
+                    vscode.window.showWarningMessage(`Source files missing for ${node.name}. Try refreshing.`);
+                    return;
+                }
+
+                fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+                copyRecursiveSync(node.localPath, targetDir);
+            });
+
+            skillsProvider.refresh();
+
+            // Auto sync after install
+            const { syncToAgentsMd } = await import('./services/sync');
+            const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
+            const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
+
+            if (result.success) {
+                vscode.window.showInformationMessage(`Installed skill "${node.name}" and synced.`);
+            } else {
+                vscode.window.showWarningMessage(`Installed skill "${node.name}", but sync failed: ${result.message}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('agentskills.deleteSkill', async (node: Skill) => {
+            if (!node || !('repoUrl' in node)) {
+                vscode.window.showErrorMessage('Please select a skill to delete.');
+                return;
+            }
+
+            if (!vscode.workspace.workspaceFolders) {
+                vscode.window.showErrorMessage('Please open a workspace folder first.');
+                return;
+            }
+
+            const confirm = await vscode.window.showWarningMessage(
+                `Delete skill "${node.name}" from this project?`,
+                'Yes', 'No'
+            );
+
+            if (confirm !== 'Yes') return;
+
+            const targetBase = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, '.agent', 'skills');
+            const targetDir = path.join(targetBase, node.name);
+
+            if (fs.existsSync(targetDir)) {
+                fs.rmSync(targetDir, { recursive: true, force: true });
+            }
+
+            skillsProvider.refresh();
+            vscode.window.showInformationMessage(`Deleted skill "${node.name}".`);
+        }),
+
+        vscode.commands.registerCommand('agentskills.deleteLocalSkill', async (node: LocalSkill) => {
+            if (!node || node.type !== 'local-skill') {
+                vscode.window.showErrorMessage('Please select a local skill to delete.');
+                return;
+            }
+
+            const confirm = await vscode.window.showWarningMessage(
+                `Delete skill "${node.name}" from ${node.groupPath}?`,
+                'Yes', 'No'
+            );
+
+            if (confirm !== 'Yes') return;
+
+            try {
+                if (fs.existsSync(node.path)) {
+                    fs.rmSync(node.path, { recursive: true, force: true });
+                }
+                skillsProvider.refresh();
+                vscode.window.showInformationMessage(`Deleted skill "${node.name}".`);
+            } catch (e) {
+                vscode.window.showErrorMessage(`Failed to delete skill: ${e}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('agentskills.openLocalSkill', async (node: LocalSkill) => {
+            if (!node || node.type !== 'local-skill') return;
+
+            const skillMdPath = path.join(node.path, 'SKILL.md');
+            if (fs.existsSync(skillMdPath)) {
+                const doc = await vscode.workspace.openTextDocument(skillMdPath);
+                await vscode.window.showTextDocument(doc);
+            }
+        }),
+
+        vscode.commands.registerCommand('agentskills.syncToCurrentIde', async () => {
+            if (!vscode.workspace.workspaceFolders) {
+                vscode.window.showErrorMessage('Please open a workspace folder first.');
+                return;
+            }
+
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Syncing skills to current IDE...',
+                cancellable: false
+            }, async () => {
+                outputChannel.show();
+                console.log(`Syncing skills to current IDE: ${vscode.env.appName}`);
+                const { syncToAgentsMd } = await import('./services/sync');
+                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
+                const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
+
+                if (result.success) {
+                    vscode.window.showInformationMessage(result.message);
+                } else {
+                    vscode.window.showErrorMessage(result.message);
+                }
+            });
+
+            skillsProvider.refresh();
         })
     );
+
+    // Check sync status on startup and notify user
+    checkSyncStatusOnStartup(skillsProvider);
+}
+
+/**
+ * Check sync status on startup and show notification if needed
+ */
+async function checkSyncStatusOnStartup(skillsProvider: SkillsProvider): Promise<void> {
+    // Wait a bit for the extension to fully initialize
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const syncStatus = skillsProvider.getSyncStatus();
+    if (syncStatus.needsSync) {
+        const action = await vscode.window.showInformationMessage(
+            `Skills in .agent/skills are not synced to ${syncStatus.rulesFile}. Sync now?`,
+            'Sync',
+            'Later'
+        );
+        if (action === 'Sync') {
+            await vscode.commands.executeCommand('agentskills.syncToCurrentIde');
+        }
+    }
 }
 
 export function deactivate() { }

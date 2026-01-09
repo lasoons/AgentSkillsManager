@@ -26,7 +26,7 @@ export function generateSkillsXml(skills: InstalledSkill[]): string {
             (s) => `<skill>
 <name>${s.name}</name>
 <description>${s.description}</description>
-<location>${s.location}</location>
+<location>${s.explicitLocation || s.location}</location>
 </skill>`
         )
         .join('\n\n');
