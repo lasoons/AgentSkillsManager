@@ -1,6 +1,6 @@
 # Agent Skills Manager
 
-A VSCode extension for managing, installing, and syncing Agent Skills from Git repositories.
+AgentSkills Multi-Platform Management Plugin: Supports Agent/Claude Skills download and installation for Antigravity, Cursor, Windsurf, and Trae.
 
 ![image](https://raw.githubusercontent.com/lasoons/AgentSkillsManager/refs/heads/main/resources/image.png)
 
