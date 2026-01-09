@@ -38,7 +38,7 @@ export interface InstalledSkill {
     description: string;
     location: 'project' | 'global';
     path: string;
-    explicitLocation?: string; // e.g. "project/.agent/skills/myskill/SKILL.md"
+    explicitLocation?: string; // e.g. "project/.claude/skills/myskill/SKILL.md"
 }
 
 /**
@@ -46,7 +46,7 @@ export interface InstalledSkill {
  */
 export interface LocalSkillsGroup {
     type: 'local-group';
-    name: string;           // Display name, e.g. "project/.agent/skills"
+    name: string;           // Display name, e.g. "project/.claude/skills"
     path: string;           // Actual directory path
     icon: string;           // Icon name
     exists: boolean;        // Whether the directory exists

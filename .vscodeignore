@@ -12,3 +12,6 @@ tsconfig.json
 !CHANGELOG.md
 !**/SKILL.md
 esbuild.js
+resources/image.png
+resources/skills-icon.png
+resources/skills-icon.svg

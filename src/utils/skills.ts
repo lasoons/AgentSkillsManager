@@ -21,33 +21,33 @@ export function getSkillDirectories(workspaceRoot: string): SkillDirectory[] {
     return [
         // Project-level directories
         {
-            path: path.join(workspaceRoot, '.agent', 'skills'),
-            displayName: '.agent/skills',
+            path: path.join(workspaceRoot, '.claude', 'skills'),
+            displayName: '.claude/skills',
             isProject: true,
-            icon: 'folder'
+            icon: 'folder-library'
         },
         {
             path: path.join(workspaceRoot, '.cursor', 'skills'),
             displayName: '.cursor/skills',
             isProject: true,
-            icon: 'folder'
+            icon: 'folder-library'
         },
         {
             path: path.join(workspaceRoot, '.trae', 'skills'),
             displayName: '.trae/skills',
             isProject: true,
-            icon: 'folder'
+            icon: 'folder-library'
         },
         {
             path: path.join(workspaceRoot, '.windsurf', 'skills'),
             displayName: '.windsurf/skills',
             isProject: true,
-            icon: 'folder'
+            icon: 'folder-library'
         },
         // Global directories
         {
-            path: path.join(os.homedir(), '.agent', 'skills'),
-            displayName: '~/.agent/skills',
+            path: path.join(os.homedir(), '.claude', 'skills'),
+            displayName: '~/.claude/skills',
             isProject: false,
             icon: 'home'
         },
@@ -57,18 +57,12 @@ export function getSkillDirectories(workspaceRoot: string): SkillDirectory[] {
             isProject: false,
             icon: 'home'
         },
-        {
-            path: path.join(os.homedir(), '.claude', 'skills'),
-            displayName: '~/.claude/skills',
-            isProject: false,
-            icon: 'home'
-        },
     ];
 }
 
 /**
  * Get all searchable skill directories in priority order
- * Priority: project .agent > global .agent > project .claude > global .claude
+ * Priority: project .claude > global .claude > project .codex > global .codex
  */
 export function getSearchDirs(workspaceRoot: string): string[] {
     return getSkillDirectories(workspaceRoot).map(d => d.path);

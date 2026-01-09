@@ -108,6 +108,11 @@
                 "command": "agentskills.syncToCurrentIde",
                 "title": "Sync to Current IDE",
                 "icon": "$(sync)"
+            },
+            {
+                "command": "agentskills.installPersonalSkill",
+                "title": "Install Skill",
+                "icon": "$(cloud-download)"
             }
         ],
         "viewsContainers": {
@@ -189,6 +194,11 @@
                 {
                     "command": "agentskills.syncToCurrentIde",
                     "when": "viewItem == localSkillsGroupNeedsSync",
+                    "group": "inline"
+                },
+                {
+                    "command": "agentskills.installPersonalSkill",
+                    "when": "viewItem == personalSkill",
                     "group": "inline"
                 }
             ]

@@ -2,18 +2,18 @@
 
 A VSCode extension for managing, installing, and syncing Agent Skills from Git repositories.
 
-![image](resources/image.png)
+![image](https://raw.githubusercontent.com/lasoons/AgentSkillsManager/refs/heads/main/resources/image.png)
 
 ## Features
 
 - **Repository Management**: Add, remove, and switch branches of skill repositories
-- **Skill Installation**: Browse and install skills to your project's `.agent/skills` directory
+- **Skill Installation**: Browse and install skills to your project's `.claude/skills` directory
 - **Sync to AGENTS.md**: Automatically sync installed skills to your IDE's rules file
 - **Multi-IDE Support**: Works with VSCode, Cursor, Windsurf, Trae, and Antigravity
 
 ## Usage
 
-1. Open the **Agent Skills** panel in the Activity Bar ![icon](resources/skills-icon.png)
+1. Open the **Agent Skills** panel in the Activity Bar ![icon](https://raw.githubusercontent.com/lasoons/AgentSkillsManager/refs/heads/main/resources/skills-icon.png)
 2. Click **+** to add a skill repository (e.g., `https://github.com/anthropics/skills`)
 3. Expand the repository to browse available skills
 4. Check the skills you want, then click **Install**
@@ -41,7 +41,7 @@ Sourced from [heilcheng/awesome-agent-skills](https://github.com/heilcheng/aweso
 
 ## Configuration
 
-Skills are installed to `.agent/skills/<skill-name>/` in your workspace.
+Skills are installed to `.claude/skills/<skill-name>/` in your workspace.
 
 The sync target depends on your IDE:
 - **VSCode**: `AGENTS.md`
