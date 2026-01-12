@@ -413,6 +413,20 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Show the view on first load or update to help user find the extension
+    const extensionId = 'whyuds.agent-skills-manager';
+    const extension = vscode.extensions.getExtension(extensionId);
+    const currentVersion = extension?.packageJSON.version;
+    const lastVersion = context.globalState.get<string>('agentskills.lastShownVersion');
+
+    if (currentVersion && currentVersion !== lastVersion) {
+        // Delay slightly to ensure UI is ready
+        setTimeout(() => {
+            vscode.commands.executeCommand('workbench.view.extension.agentskills-explorer');
+        }, 1000);
+        context.globalState.update('agentskills.lastShownVersion', currentVersion);
+    }
+
     // Check sync status on startup and notify user
     checkSyncStatusOnStartup(skillsProvider);
 }

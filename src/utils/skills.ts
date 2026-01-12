@@ -24,7 +24,7 @@ export function getSkillDirectories(workspaceRoot: string): SkillDirectory[] {
             path: path.join(workspaceRoot, '.claude', 'skills'),
             displayName: '.claude/skills',
             isProject: true,
-            icon: 'folder-library'
+            icon: 'folder'
         },
         {
             path: path.join(workspaceRoot, '.cursor', 'skills'),
