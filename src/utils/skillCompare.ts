@@ -11,90 +11,50 @@ function computeFileHash(filePath: string): string {
 }
 
 /**
- * Recursively collect all file paths and their hashes in a directory
- * Returns a sorted array of "relativePath:hash" strings for deterministic comparison
+ * Compute the hash of the SKILL.md file in the directory
+ * Only uses SKILL.md for comparison as requested
  */
-function collectFileHashes(dirPath: string, basePath: string = dirPath): string[] {
-    const hashes: string[] = [];
-
-    if (!fs.existsSync(dirPath)) {
-        return hashes;
+export function computeSkillHash(dirPath: string): string {
+    const skillMdPath = path.join(dirPath, 'SKILL.md');
+    if (!fs.existsSync(skillMdPath)) {
+        return '';
     }
-
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-        // Skip hidden files and directories
-        if (entry.name.startsWith('.')) {
-            continue;
-        }
-
-        const fullPath = path.join(dirPath, entry.name);
-        const relativePath = path.relative(basePath, fullPath).replace(/\\/g, '/');
-
-        if (entry.isDirectory()) {
-            // Recurse into subdirectories
-            hashes.push(...collectFileHashes(fullPath, basePath));
-        } else if (entry.isFile()) {
-            const fileHash = computeFileHash(fullPath);
-            hashes.push(`${relativePath}:${fileHash}`);
-        } else if (entry.isSymbolicLink()) {
-            // For symlinks, hash the target path (not following it)
-            try {
-                const target = fs.readlinkSync(fullPath);
-                const linkHash = crypto.createHash('md5').update(target).digest('hex');
-                hashes.push(`${relativePath}:link:${linkHash}`);
-            } catch {
-                // Ignore broken symlinks
-            }
-        }
-    }
-
-    return hashes.sort();
+    return computeFileHash(skillMdPath);
 }
 
 /**
- * Compute a combined hash for an entire directory
- * This hash changes if any file content, name, or structure changes
- */
-export function computeDirectoryHash(dirPath: string): string {
-    const fileHashes = collectFileHashes(dirPath);
-    const combined = fileHashes.join('\n');
-    return crypto.createHash('md5').update(combined).digest('hex');
-}
-
-/**
- * Compare two skill directories to check if they have identical content
+ * Compare two skill directories based on their SKILL.md content
  * @param dir1 First directory path
  * @param dir2 Second directory path
- * @returns true if directories have identical content, false otherwise
+ * @returns true if SKILL.md files are identical, false otherwise
  */
 export function compareSkillDirectories(dir1: string, dir2: string): boolean {
     if (!fs.existsSync(dir1) || !fs.existsSync(dir2)) {
         return false;
     }
 
-    const hash1 = computeDirectoryHash(dir1);
-    const hash2 = computeDirectoryHash(dir2);
+    const hash1 = computeSkillHash(dir1);
+    const hash2 = computeSkillHash(dir2);
 
     return hash1 === hash2;
 }
 
 /**
- * Cache for directory hashes to avoid recomputing
+ * Cache for skill hashes to avoid recomputing
  */
 const hashCache = new Map<string, { hash: string; mtime: number }>();
 
 /**
- * Get cached directory hash, recomputing if directory has been modified
+ * Get cached skill hash (of SKILL.md), recomputing if file has been modified
  */
-export function getCachedDirectoryHash(dirPath: string): string {
-    if (!fs.existsSync(dirPath)) {
+export function getCachedSkillHash(dirPath: string): string {
+    const skillMdPath = path.join(dirPath, 'SKILL.md');
+    if (!fs.existsSync(skillMdPath)) {
         return '';
     }
 
     try {
-        const stats = fs.statSync(dirPath);
+        const stats = fs.statSync(skillMdPath);
         const mtime = stats.mtimeMs;
         const cached = hashCache.get(dirPath);
 
@@ -102,7 +62,7 @@ export function getCachedDirectoryHash(dirPath: string): string {
             return cached.hash;
         }
 
-        const hash = computeDirectoryHash(dirPath);
+        const hash = computeSkillHash(dirPath);
         hashCache.set(dirPath, { hash, mtime });
         return hash;
     } catch {

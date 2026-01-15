@@ -5,7 +5,7 @@ import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
 import { Skill, SkillRepo, SkillMatchStatus, LocalSkillsGroup, LocalSkill } from './types';
 import { getIdeConfig, resolveIdeType } from './utils/ide';
-import { getCachedDirectoryHash, clearHashCache } from './utils/skillCompare';
+import { getCachedSkillHash, clearHashCache } from './utils/skillCompare';
 import { getSkillDirectories } from './utils/skills';
 import { extractYamlField } from './utils/yaml';
 
@@ -121,7 +121,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
                 if (entry.isDirectory() && !entry.name.startsWith('.')) {
                     const skillDir = path.join(dir, entry.name);
                     if (fs.existsSync(path.join(skillDir, 'SKILL.md'))) {
-                        const hash = getCachedDirectoryHash(skillDir);
+                        const hash = getCachedSkillHash(skillDir);
                         this.installedSkillHashes.set(entry.name, hash);
                     }
                 }
@@ -139,7 +139,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
 
         // Compare with repo skill hash
         if (skill.localPath && fs.existsSync(skill.localPath)) {
-            const repoHash = getCachedDirectoryHash(skill.localPath);
+            const repoHash = getCachedSkillHash(skill.localPath);
             return installedHash === repoHash ? SkillMatchStatus.Matched : SkillMatchStatus.Conflict;
         }
 

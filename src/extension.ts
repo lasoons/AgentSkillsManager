@@ -291,13 +291,6 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            const confirm = await vscode.window.showWarningMessage(
-                `Delete skill "${node.name}" from this project?`,
-                'Yes', 'No'
-            );
-
-            if (confirm !== 'Yes') return;
-
             const targetBase = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, '.claude', 'skills');
             const targetDir = path.join(targetBase, node.name);
 
@@ -314,13 +307,6 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage('Please select a local skill to delete.');
                 return;
             }
-
-            const confirm = await vscode.window.showWarningMessage(
-                `Delete skill "${node.name}" from ${node.groupPath}?`,
-                'Yes', 'No'
-            );
-
-            if (confirm !== 'Yes') return;
 
             try {
                 if (fs.existsSync(node.path)) {
