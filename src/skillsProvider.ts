@@ -4,7 +4,7 @@ import * as path from 'path';
 import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
 import { Skill, SkillRepo, SkillMatchStatus, LocalSkillsGroup, LocalSkill } from './types';
-import { getIdeConfig, resolveIdeType } from './utils/ide';
+import { getProjectSkillsDir } from './utils/ide';
 import { getCachedSkillHash, clearHashCache } from './utils/skillCompare';
 import { getSkillDirectories } from './utils/skills';
 import { extractYamlField } from './utils/yaml';
@@ -34,14 +34,12 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     readonly onDidChangeTreeData: vscode.Event<TreeNode | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private checkedSkills: Set<string> = new Set();
-    private syncedSkillsCache: Map<string, string> = new Map(); // skillName -> location
     private skillCache: Map<string, Skill> = new Map();
     private installedSkillHashes: Map<string, string> = new Map(); // skillName -> hash
 
     refresh(): void {
         clearHashCache();
         this.updateInstalledSkillHashes();
-        this.updateSyncedSkillsCache();
         this._onDidChangeTreeData.fire();
     }
 
@@ -71,27 +69,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         this.refresh();
     }
 
-    /**
-     * Get sync status for startup notification
-     */
-    getSyncStatus(): { needsSync: boolean; currentIde: string; rulesFile: string } {
-        const root = this.getWorkspaceRoot();
-        if (!root) return { needsSync: false, currentIde: '', rulesFile: '' };
-
-        const currentIde = resolveIdeType(vscode.env.appName);
-        const config = getIdeConfig(currentIde);
-        const rulesPath = path.join(root, config.rulesFile);
-        const projectSkillsPath = path.join(root, '.claude', 'skills');
-
-        const isSynced = this.checkProjectSkillsSynced(projectSkillsPath, rulesPath);
-
-        return {
-            needsSync: !isSynced,
-            currentIde: currentIde,
-            rulesFile: config.rulesFile
-        };
-    }
-
     private getSkillKey(skill: Skill): string {
         return `${skill.repoUrl}::${skill.name}`;
     }
@@ -102,7 +79,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
 
     private getInstalledSkillsDir(): string | undefined {
         const root = this.getWorkspaceRoot();
-        return root ? path.join(root, '.claude', 'skills') : undefined;
+        return root ? getProjectSkillsDir(root, vscode.env.appName) : undefined;
     }
 
     private isSkillInstalled(skillName: string): boolean {
@@ -146,66 +123,25 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         return SkillMatchStatus.NotInstalled;
     }
 
-    private updateSyncedSkillsCache(): void {
-        this.syncedSkillsCache.clear();
-        const root = this.getWorkspaceRoot();
-        if (!root) return;
-
-        const config = getIdeConfig(vscode.env.appName);
-        const agentsPath = path.join(root, config.rulesFile);
-        if (!fs.existsSync(agentsPath)) return;
-
-        const content = fs.readFileSync(agentsPath, 'utf-8');
-        // Parse skill entries with both name and location
-        const skillRegex = /<skill>[\s\S]*?<name>([^<]+)<\/name>[\s\S]*?<location>([^<]+)<\/location>[\s\S]*?<\/skill>/g;
-        let match;
-        while ((match = skillRegex.exec(content)) !== null) {
-            this.syncedSkillsCache.set(match[1].trim(), match[2].trim());
-        }
-    }
-
-    /**
-     * Check if a skill is synced based on name and location
-     * @param skillName The name of the skill
-     * @param isProjectSkill Whether the skill is from project directory (vs personal directory)
-     */
-    private isSkillSynced(skillName: string, isProjectSkill: boolean): boolean {
-        const syncedLocation = this.syncedSkillsCache.get(skillName);
-        if (!syncedLocation) return false;
-
-        // 'global' means personal directory skill
-        // Otherwise it's a path like '.claude/skills/xxx/SKILL.md' which is project skill
-        const syncedIsProject = syncedLocation !== 'global';
-        return syncedIsProject === isProjectSkill;
-    }
-
     private getLocalSkillsGroups(): LocalSkillsGroup[] {
         const root = this.getWorkspaceRoot();
         if (!root) return [];
 
-        const currentIde = resolveIdeType(vscode.env.appName);
-        const config = getIdeConfig(currentIde);
-        const rulesPath = path.join(root, config.rulesFile);
-        const projectSkillsPath = path.join(root, '.claude', 'skills');
-
-        // Check if .claude/skills has skills synced to current IDE
-        const isProjectSkillsSynced = this.checkProjectSkillsSynced(projectSkillsPath, rulesPath);
+        const activeProjectSkillsPath = getProjectSkillsDir(root, vscode.env.appName);
 
         return getSkillDirectories(root)
             .map(dir => {
-                const isProjectAgentSkills = dir.path === projectSkillsPath;
                 return {
                     type: 'local-group' as const,
                     name: dir.displayName,
                     path: dir.path,
                     icon: dir.icon,
                     exists: fs.existsSync(dir.path),
-                    needsSync: isProjectAgentSkills ? !isProjectSkillsSynced : undefined,
-                    currentIde: isProjectAgentSkills ? currentIde : undefined
+                    isActive: dir.path === activeProjectSkillsPath
                 };
             })
             .filter(group => {
-                // Only show groups that exist and have at least one skill
+                if (group.isActive) return true;
                 if (!group.exists) return false;
                 try {
                     const entries = fs.readdirSync(group.path, { withFileTypes: true });
@@ -220,42 +156,9 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             });
     }
 
-    /**
-     * Check if .claude/skills has skills and they are synced to rules file
-     */
-    private checkProjectSkillsSynced(skillsDir: string, rulesPath: string): boolean {
-        if (!fs.existsSync(skillsDir)) return true; // No skills = synced
-
-        // Check if there are any skills in the directory
-        try {
-            const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-            const hasSkills = entries.some(entry =>
-                entry.isDirectory() &&
-                !entry.name.startsWith('.') &&
-                fs.existsSync(path.join(skillsDir, entry.name, 'SKILL.md'))
-            );
-            if (!hasSkills) return true; // No skills = synced
-        } catch {
-            return true;
-        }
-
-        // Check if rules file exists and has skills
-        if (!fs.existsSync(rulesPath)) return false;
-
-        try {
-            const content = fs.readFileSync(rulesPath, 'utf-8');
-            // Check if the rules file has skills_system section
-            return content.includes('<skills_system') || content.includes('<available_skills>');
-        } catch {
-            return false;
-        }
-    }
-
     private getLocalSkillsFromGroup(group: LocalSkillsGroup): LocalSkill[] {
         if (!fs.existsSync(group.path)) return [];
 
-        const root = this.getWorkspaceRoot();
-        const isProjectGroup = root ? group.path.startsWith(root) : false;
         const skills: LocalSkill[] = [];
         try {
             const entries = fs.readdirSync(group.path, { withFileTypes: true });
@@ -271,7 +174,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
                             description: extractYamlField(content, 'description') || '',
                             path: skillPath,
                             groupPath: group.path,
-                            synced: this.isSkillSynced(entry.name, isProjectGroup)
                         });
                     }
                 }
@@ -290,20 +192,12 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
                 vscode.TreeItemCollapsibleState.Collapsed
             );
 
-            // For .claude/skills, show sync status
-            if (element.needsSync !== undefined) {
-                if (element.needsSync) {
-                    item.contextValue = 'localSkillsGroupNeedsSync';
-                    item.description = `[Needs Sync to ${element.currentIde}]`;
-                    item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('editorWarning.foreground'));
-                } else {
-                    item.contextValue = 'localSkillsGroup';
-                    item.description = '[Synced]';
-                    item.iconPath = new vscode.ThemeIcon(element.icon);
-                }
-            } else {
-                item.contextValue = 'localSkillsGroup';
-                item.iconPath = new vscode.ThemeIcon(element.icon);
+            item.contextValue = 'localSkillsGroup';
+            item.iconPath = element.isActive
+                ? new vscode.ThemeIcon('layers-active')
+                : new vscode.ThemeIcon(element.icon);
+            if (element.isActive) {
+                item.description = '[Active]';
             }
 
             item.tooltip = element.path;
@@ -321,14 +215,8 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             if (isProjectSkill) {
                 // Project skills: have delete and open buttons
                 item.contextValue = 'localSkill';
-
-                const status: string[] = [];
-                if (element.synced) status.push('Synced');
-                item.description = status.length > 0 ? `[${status.join(', ')}]` : element.description;
-
-                item.iconPath = element.synced
-                    ? new vscode.ThemeIcon('pass-filled')
-                    : new vscode.ThemeIcon('tools');
+                item.description = element.description;
+                item.iconPath = new vscode.ThemeIcon('tools');
             } else {
                 // Personal directory skills: have install button only (like git skills)
                 item.contextValue = 'personalSkill';
@@ -337,7 +225,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
                 const installed = this.isSkillInstalled(element.name);
                 const status: string[] = [];
                 if (installed) status.push('Installed');
-                if (element.synced) status.push('Synced');
 
                 const truncatedDesc = element.description.length > 10
                     ? element.description.substring(0, 10) + '...'
@@ -346,9 +233,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
 
                 if (installed) {
                     item.contextValue = 'personalSkillInstalled';
-                    item.iconPath = element.synced
-                        ? new vscode.ThemeIcon('pass-filled')
-                        : new vscode.ThemeIcon('check');
+                    item.iconPath = new vscode.ThemeIcon('check');
                 } else {
                     item.iconPath = new vscode.ThemeIcon('tools');
                 }
@@ -377,7 +262,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         // Repo skill
         if (isSkill(element)) {
             const matchStatus = element.matchStatus ?? this.getSkillMatchStatus(element);
-            const synced = this.isSkillSynced(element.name, true); // Repo skills install to project directory
             const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.None);
             const key = this.getSkillKey(element);
 
@@ -401,7 +285,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             const installed = matchStatus === SkillMatchStatus.Matched;
             const status: string[] = [];
             if (installed) status.push('Installed');
-            if (synced) status.push('Synced');
 
             item.contextValue = installed ? 'skillInstalled' : 'skill';
             const truncatedDesc = element.description.length > 10
@@ -411,9 +294,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             item.tooltip = `${element.name}\n${element.description}\n${element.path}`;
 
             let iconName = 'tools';
-            if (installed && synced) {
-                iconName = 'pass-filled';
-            } else if (installed) {
+            if (installed) {
                 iconName = 'check';
             }
             item.iconPath = new vscode.ThemeIcon(iconName);
@@ -432,7 +313,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     async getChildren(element?: TreeNode): Promise<TreeNode[]> {
         if (!element) {
             // Root level: local skill groups + repos
-            this.updateSyncedSkillsCache();
             const localGroups = this.getLocalSkillsGroups();
             const repos = ConfigManager.getRepos();
             return [...localGroups, ...repos];

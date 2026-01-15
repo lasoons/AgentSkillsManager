@@ -14,3 +14,6 @@ tsconfig.json
 esbuild.js
 resources/image.png
 resources/skills-icon.png
+.trae
+.cursor
+.agent

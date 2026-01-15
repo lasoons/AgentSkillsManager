@@ -24,23 +24,6 @@ export interface SkillRepo {
     isPreset?: boolean; // Whether this is a preset (built-in) repository
 }
 
-export interface SyncResult {
-    success: boolean;
-    message: string;
-    count: number;
-}
-
-/**
- * Represents an installed skill (in project or global directory)
- */
-export interface InstalledSkill {
-    name: string;
-    description: string;
-    location: 'project' | 'global';
-    path: string;
-    explicitLocation?: string; // e.g. "project/.claude/skills/myskill/SKILL.md"
-}
-
 /**
  * Represents a local skills directory group in the TreeView
  */
@@ -50,8 +33,7 @@ export interface LocalSkillsGroup {
     path: string;           // Actual directory path
     icon: string;           // Icon name
     exists: boolean;        // Whether the directory exists
-    needsSync?: boolean;    // Whether skills exist but not synced to current IDE
-    currentIde?: string;    // Current IDE type (e.g. 'antigravity', 'cursor')
+    isActive: boolean;      // Whether this is the active skills directory for current IDE
 }
 
 /**
@@ -63,6 +45,5 @@ export interface LocalSkill {
     description: string;
     path: string;           // Full path to skill directory
     groupPath: string;      // Parent group directory path
-    synced: boolean;        // Whether synced to AGENTS.md
 }
 

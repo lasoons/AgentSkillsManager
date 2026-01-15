@@ -2,7 +2,7 @@
     "name": "agent-skills-manager",
     "displayName": "AgentSkillsManager",
     "description": "Manage, install, and sync Agent Skills (Claude Code compatible skills) from VSCode.",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "publisher": "whyuds",
     "repository": {
         "type": "git",
@@ -70,11 +70,6 @@
                 "icon": "$(trash)"
             },
             {
-                "command": "agentskills.sync",
-                "title": "Sync to AGENTS.md",
-                "icon": "$(sync)"
-            },
-            {
                 "command": "agentskills.switchBranch",
                 "title": "Switch Branch",
                 "icon": "$(git-branch)"
@@ -103,11 +98,6 @@
                 "command": "agentskills.deleteSkill",
                 "title": "Delete Skill",
                 "icon": "$(trash)"
-            },
-            {
-                "command": "agentskills.syncToCurrentIde",
-                "title": "Sync to Current IDE",
-                "icon": "$(sync)"
             },
             {
                 "command": "agentskills.installPersonalSkill",
@@ -189,11 +179,6 @@
                 {
                     "command": "agentskills.deleteSkill",
                     "when": "viewItem == skillInstalled",
-                    "group": "inline"
-                },
-                {
-                    "command": "agentskills.syncToCurrentIde",
-                    "when": "viewItem == localSkillsGroupNeedsSync",
                     "group": "inline"
                 },
                 {

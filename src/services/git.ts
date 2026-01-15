@@ -22,6 +22,15 @@ export class GitService {
         return fs.existsSync(path.join(repoPath, '.git'));
     }
 
+    private static async isValidGitRepo(repoPath: string): Promise<boolean> {
+        try {
+            const output = await this.execGitOutputInDir(repoPath, ['rev-parse', '--is-inside-work-tree']);
+            return output.trim() === 'true';
+        } catch {
+            return false;
+        }
+    }
+
     static async getRemoteBranches(url: string): Promise<string[]> {
         try {
             const output = await this.execGitOutput(['ls-remote', '--heads', url]);
@@ -40,15 +49,14 @@ export class GitService {
     static async ensureRepoCloned(url: string, branch?: string): Promise<string> {
         const repoPath = this.getRepoPath(url);
 
-        if (!fs.existsSync(path.join(repoPath, '.git'))) {
+        if (!fs.existsSync(path.join(repoPath, '.git')) || !(await this.isValidGitRepo(repoPath))) {
             if (fs.existsSync(repoPath)) {
                 fs.rmSync(repoPath, { recursive: true, force: true });
             }
             const dirName = path.basename(repoPath);
-            const args = ['clone', '--depth', '1', url, dirName];
-            if (branch) {
-                args.push('--branch', branch);
-            }
+            const args = ['clone', '--depth', '1'];
+            if (branch) args.push('--branch', branch);
+            args.push(url, dirName);
             await this.execGitSilent(CACHE_DIR, args);
         }
         return repoPath;
@@ -57,10 +65,7 @@ export class GitService {
     static async pullRepo(url: string, branch?: string): Promise<void> {
         const repoPath = this.getRepoPath(url);
 
-        if (!fs.existsSync(path.join(repoPath, '.git'))) {
-            await this.ensureRepoCloned(url, branch);
-            return;
-        }
+        await this.ensureRepoCloned(url, branch);
 
         await this.execGitSilent(repoPath, ['fetch', 'origin']);
         if (branch) {
@@ -79,6 +84,21 @@ export class GitService {
     private static execGitOutput(args: string[]): Promise<string> {
         return new Promise((resolve, reject) => {
             cp.execFile('git', args, {
+                windowsHide: true
+            }, (error, stdout, stderr) => {
+                if (error) {
+                    reject(new Error(`Git command failed: ${stderr || error.message}`));
+                } else {
+                    resolve(stdout);
+                }
+            });
+        });
+    }
+
+    private static execGitOutputInDir(cwd: string, args: string[]): Promise<string> {
+        return new Promise((resolve, reject) => {
+            cp.execFile('git', args, {
+                cwd,
                 windowsHide: true
             }, (error, stdout, stderr) => {
                 if (error) {

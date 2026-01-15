@@ -20,7 +20,7 @@ export function scanSkillsFromDir(repoPath: string, repoUrl: string): Skill[] {
         try {
             const entries = fs.readdirSync(dir, { withFileTypes: true });
             for (const entry of entries) {
-                if (entry.name.startsWith('.')) continue;
+                if (entry.name === '.git') continue;
 
                 const fullPath = path.join(dir, entry.name);
                 if (entry.isDirectory()) {

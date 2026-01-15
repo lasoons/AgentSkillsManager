@@ -1,15 +1,15 @@
 # Agent Skills Manager
 
-AgentSkills Multi-Platform Management Plugin: Supports Agent/Claude Skills download and installation for Antigravity, Cursor, Windsurf, and Trae.
+AgentSkills multi-IDE management extension: browse and install skill repositories for Antigravity, Cursor, Trae (and VS Code).
 
 ![image](https://raw.githubusercontent.com/lasoons/AgentSkillsManager/refs/heads/main/resources/image.png)
 
 ## Features
 
 - **Repository Management**: Add, remove, and switch branches of skill repositories
-- **Skill Installation**: Browse and install skills to your project's `.claude/skills` directory
-- **Sync to AGENTS.md**: Automatically sync installed skills to your IDE's rules file
-- **Multi-IDE Support**: Works with VSCode, Cursor, Windsurf, Trae, and Antigravity
+- **Skill Installation**: Install skills into the active IDE skills directory
+- **Multi-IDE Support**: Works with VSCode, Cursor, Trae, and Antigravity
+- **Active Skills Directory**: The local skills group shows which directory is active
 
 ## Usage
 
@@ -17,6 +17,13 @@ AgentSkills Multi-Platform Management Plugin: Supports Agent/Claude Skills downl
 2. Click **+** to add a skill repository (e.g., `https://github.com/anthropics/skills`)
 3. Expand the repository to browse available skills
 4. Check the skills you want, then click **Install**
+
+Preset repositories included by default:
+- `https://github.com/anthropics/skills.git`
+- `https://github.com/openai/skills`
+- `https://github.com/skillcreatorai/Ai-Agent-Skills`
+- `https://github.com/obra/superpowers`
+- `https://github.com/ComposioHQ/awesome-claude-skills.git`
 
 ## Skill Collections
 
@@ -41,14 +48,13 @@ Sourced from [heilcheng/awesome-agent-skills](https://github.com/heilcheng/aweso
 
 ## Configuration
 
-Skills are installed to `.claude/skills/<skill-name>/` in your workspace.
+Skills are installed to the active skills directory in your workspace:
+- **VSCode**: `.claude/skills`
+- **Cursor**: `.cursor/skills`
+- **Trae**: `.trae/skills`
+- **Antigravity**: `.agent/skills`
 
-The sync target depends on your IDE:
-- **VSCode**: `AGENTS.md`
-- **Cursor**: `.cursor/rules/agentskills.mdc`
-- **Windsurf**: `.windsurf/rules/agentskills.md`
-- **Trae**: `.trae/rules/agentskills.md`
-- **Antigravity**: `.agent/rules/agentskills.md`
+The extension also scans skills in hidden directories inside repositories (for example `.curated`, `.experimental`).
 
 ## License
 

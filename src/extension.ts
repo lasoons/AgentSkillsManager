@@ -6,6 +6,7 @@ import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
 import { Skill, SkillRepo, LocalSkill } from './types';
 import { copyRecursiveSync } from './utils/fs';
+import { getProjectSkillsDir } from './utils/ide';
 
 type TreeNode = SkillRepo | Skill | { type: string; name: string; path: string };
 let skillsTreeView: vscode.TreeView<TreeNode>;
@@ -124,31 +125,6 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage(`${node.name} updated.`);
         }),
 
-        vscode.commands.registerCommand('agentskills.sync', async () => {
-            if (!vscode.workspace.workspaceFolders) {
-                vscode.window.showErrorMessage('Please open a workspace folder first.');
-                return;
-            }
-
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: 'Syncing to AGENTS.md...',
-                cancellable: false
-            }, async () => {
-                outputChannel.show();
-                console.log(`Starting sync process... IDE: ${vscode.env.appName}`);
-                const { syncToAgentsMd } = await import('./services/sync');
-                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-                const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
-
-                if (result.success) {
-                    vscode.window.showInformationMessage(result.message);
-                } else {
-                    vscode.window.showErrorMessage(result.message);
-                }
-            });
-        }),
-
         vscode.commands.registerCommand('agentskills.installSelected', async () => {
             const checked = skillsProvider.getCheckedSkills();
             const selected = checked.length > 0
@@ -170,7 +146,8 @@ export function activate(context: vscode.ExtensionContext) {
                 title: `Installing ${selected.length} skill(s)...`,
                 cancellable: false
             }, async (progress) => {
-                const targetBase = path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, '.claude', 'skills');
+                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
+                const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
 
                 for (let i = 0; i < selected.length; i++) {
                     const skill = selected[i];
@@ -188,18 +165,8 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             });
 
-            skillsProvider.refresh();
-
-            // Auto sync after install
-            const { syncToAgentsMd } = await import('./services/sync');
-            const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-            const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
-
-            if (result.success) {
-                vscode.window.showInformationMessage(`Installed ${selected.length} skill(s) and synced.`);
-            } else {
-                vscode.window.showWarningMessage(`Installed ${selected.length} skill(s), but sync failed: ${result.message}`);
-            }
+            skillsProvider.clearSelection();
+            vscode.window.showInformationMessage(`Installed ${selected.length} skill(s).`);
         }),
 
         vscode.commands.registerCommand('agentskills.deleteSelected', async () => {
@@ -225,7 +192,8 @@ export function activate(context: vscode.ExtensionContext) {
 
             if (confirm !== 'Yes') return;
 
-            const targetBase = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, '.claude', 'skills');
+            const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+            const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
 
             for (const skill of selected) {
                 const targetDir = path.join(targetBase, skill.name);
@@ -254,7 +222,8 @@ export function activate(context: vscode.ExtensionContext) {
                 title: `Installing ${node.name}...`,
                 cancellable: false
             }, async () => {
-                const targetBase = path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, '.claude', 'skills');
+                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
+                const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
                 const targetDir = path.join(targetBase, node.name);
 
                 if (!node.localPath || !fs.existsSync(node.localPath)) {
@@ -266,18 +235,8 @@ export function activate(context: vscode.ExtensionContext) {
                 copyRecursiveSync(node.localPath, targetDir);
             });
 
-            skillsProvider.refresh();
-
-            // Auto sync after install
-            const { syncToAgentsMd } = await import('./services/sync');
-            const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-            const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
-
-            if (result.success) {
-                vscode.window.showInformationMessage(`Installed skill "${node.name}" and synced.`);
-            } else {
-                vscode.window.showWarningMessage(`Installed skill "${node.name}", but sync failed: ${result.message}`);
-            }
+            skillsProvider.clearSelection();
+            vscode.window.showInformationMessage(`Installed skill "${node.name}".`);
         }),
 
         vscode.commands.registerCommand('agentskills.deleteSkill', async (node: Skill) => {
@@ -291,7 +250,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            const targetBase = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, '.claude', 'skills');
+            const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+            const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
             const targetDir = path.join(targetBase, node.name);
 
             if (fs.existsSync(targetDir)) {
@@ -329,33 +289,6 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('agentskills.syncToCurrentIde', async () => {
-            if (!vscode.workspace.workspaceFolders) {
-                vscode.window.showErrorMessage('Please open a workspace folder first.');
-                return;
-            }
-
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: 'Syncing skills to current IDE...',
-                cancellable: false
-            }, async () => {
-                outputChannel.show();
-                console.log(`Syncing skills to current IDE: ${vscode.env.appName}`);
-                const { syncToAgentsMd } = await import('./services/sync');
-                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-                const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
-
-                if (result.success) {
-                    vscode.window.showInformationMessage(result.message);
-                } else {
-                    vscode.window.showErrorMessage(result.message);
-                }
-            });
-
-            skillsProvider.refresh();
-        }),
-
         vscode.commands.registerCommand('agentskills.installPersonalSkill', async (node: LocalSkill) => {
             if (!node || node.type !== 'local-skill') {
                 vscode.window.showErrorMessage('Please select a skill to install.');
@@ -372,7 +305,8 @@ export function activate(context: vscode.ExtensionContext) {
                 title: `Installing ${node.name}...`,
                 cancellable: false
             }, async () => {
-                const targetBase = path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, '.claude', 'skills');
+                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
+                const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
                 const targetDir = path.join(targetBase, node.name);
 
                 if (!fs.existsSync(node.path)) {
@@ -384,18 +318,8 @@ export function activate(context: vscode.ExtensionContext) {
                 copyRecursiveSync(node.path, targetDir);
             });
 
-            skillsProvider.refresh();
-
-            // Auto sync after install
-            const { syncToAgentsMd } = await import('./services/sync');
-            const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-            const result = syncToAgentsMd(workspaceRoot, vscode.env.appName);
-
-            if (result.success) {
-                vscode.window.showInformationMessage(`Installed skill "${node.name}" and synced.`);
-            } else {
-                vscode.window.showWarningMessage(`Installed skill "${node.name}", but sync failed: ${result.message}`);
-            }
+            skillsProvider.clearSelection();
+            vscode.window.showInformationMessage(`Installed skill "${node.name}".`);
         })
     );
 
@@ -413,28 +337,6 @@ export function activate(context: vscode.ExtensionContext) {
         context.globalState.update('agentskills.lastShownVersion', currentVersion);
     }
 
-    // Check sync status on startup and notify user
-    checkSyncStatusOnStartup(skillsProvider);
-}
-
-/**
- * Check sync status on startup and show notification if needed
- */
-async function checkSyncStatusOnStartup(skillsProvider: SkillsProvider): Promise<void> {
-    // Wait a bit for the extension to fully initialize
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    const syncStatus = skillsProvider.getSyncStatus();
-    if (syncStatus.needsSync) {
-        const action = await vscode.window.showInformationMessage(
-            `Skills in .claude/skills are not synced to ${syncStatus.rulesFile}. Sync now?`,
-            'Sync',
-            'Later'
-        );
-        if (action === 'Sync') {
-            await vscode.commands.executeCommand('agentskills.syncToCurrentIde');
-        }
-    }
 }
 
 export function deactivate() { }

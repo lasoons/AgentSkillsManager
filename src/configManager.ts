@@ -4,7 +4,11 @@ import { GitService } from './services/git';
 
 // Preset repositories that are always included
 const PRESET_REPOS: SkillRepo[] = [
-    { url: 'https://github.com/anthropics/skills.git', name: 'anthropics/skills', isPreset: true }
+    { url: 'https://github.com/anthropics/skills.git', name: 'anthropics/skills', isPreset: true },
+    { url: 'https://github.com/openai/skills.git', name: 'openai/skills', isPreset: true },
+    { url: 'https://github.com/skillcreatorai/Ai-Agent-Skills.git', name: 'skillcreatorai/Ai-Agent-Skills', isPreset: true },
+    { url: 'https://github.com/obra/superpowers.git', name: 'obra/superpowers', isPreset: true },
+    { url: 'https://github.com/ComposioHQ/awesome-claude-skills.git', name: 'ComposioHQ/awesome-claude-skills', isPreset: true }
 ];
 
 export class ConfigManager {
