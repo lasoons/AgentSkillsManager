@@ -78,7 +78,19 @@ export class GitService {
 
     static async getSkillsFromRepo(url: string, branch?: string): Promise<Skill[]> {
         const repoPath = await this.ensureRepoCloned(url, branch);
+        if (branch) {
+            const currentBranch = await this.getCurrentBranch(repoPath);
+            if (currentBranch !== branch) {
+                await this.execGitSilent(repoPath, ['fetch', 'origin', branch]);
+                await this.execGitSilent(repoPath, ['checkout', '-B', branch, `origin/${branch}`]);
+            }
+        }
         return scanSkillsFromDir(repoPath, url);
+    }
+
+    private static async getCurrentBranch(repoPath: string): Promise<string> {
+        const output = await this.execGitOutputInDir(repoPath, ['rev-parse', '--abbrev-ref', 'HEAD']);
+        return output.trim();
     }
 
     private static execGitOutput(args: string[]): Promise<string> {

@@ -1,6 +1,6 @@
 # Agent Skills Manager
 
-AgentSkills multi-IDE management extension: browse and install skill repositories for Antigravity, Cursor, Trae (and VS Code).
+AgentSkills multi-IDE management extension: browse and install skill repositories for Antigravity, CodeBuddy, Cursor, Qoder, Trae, Windsurf (and VS Code).
 
 ![image](https://raw.githubusercontent.com/lasoons/AgentSkillsManager/refs/heads/main/resources/image.png)
 
@@ -8,7 +8,7 @@ AgentSkills multi-IDE management extension: browse and install skill repositorie
 
 - **Repository Management**: Add, remove, and switch branches of skill repositories
 - **Skill Installation**: Install skills into the active IDE skills directory
-- **Multi-IDE Support**: Works with VSCode, Cursor, Trae, and Antigravity
+- **Multi-IDE Support**: Works with VSCode, Cursor, Trae, Antigravity, Qoder, Windsurf, and CodeBuddy
 - **Active Skills Directory**: The local skills group shows which directory is active
 
 ## Usage
@@ -49,10 +49,13 @@ Sourced from [heilcheng/awesome-agent-skills](https://github.com/heilcheng/aweso
 ## Configuration
 
 Skills are installed to the active skills directory in your workspace:
-- **VSCode**: `.claude/skills`
+- **VSCode**: `.github/skills`
 - **Cursor**: `.cursor/skills`
 - **Trae**: `.trae/skills`
 - **Antigravity**: `.agent/skills`
+- **Qoder**: `.qoder/skills`
+- **Windsurf**: `.windsurf/skills`
+- **CodeBuddy**: `.codebuddy/skills`
 
 The extension also scans skills in hidden directories inside repositories (for example `.curated`, `.experimental`).
 

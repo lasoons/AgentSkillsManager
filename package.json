@@ -2,7 +2,7 @@
     "name": "agent-skills-manager",
     "displayName": "AgentSkillsManager",
     "description": "Manage, install, and sync Agent Skills (Claude Code compatible skills) from VSCode.",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "publisher": "whyuds",
     "repository": {
         "type": "git",

@@ -1,6 +1,6 @@
 # Agent Skills Manager
 
-AgentSkills 多 IDE 管理扩展：用于在 Antigravity、Cursor、Trae（以及 VS Code）中浏览与安装 skill 仓库。
+AgentSkills 多 IDE 管理扩展：用于在 Antigravity、CodeBuddy、Cursor、Qoder、Trae、Windsurf（以及 VS Code）中浏览与安装 skill 仓库。
 
 ![image](https://raw.githubusercontent.com/lasoons/AgentSkillsManager/refs/heads/main/resources/image.png)
 
@@ -8,7 +8,7 @@ AgentSkills 多 IDE 管理扩展：用于在 Antigravity、Cursor、Trae（以�
 
 - **仓库管理**：添加、删除、切换 skill 仓库分支
 - **Skill 安装**：安装到当前 IDE 对应的 skills 目录
-- **多 IDE 支持**：支持 VSCode、Cursor、Trae、Antigravity
+- **多 IDE 支持**：支持 VSCode、Cursor、Trae、Antigravity、Qoder、Windsurf、CodeBuddy
 - **激活目录标识**：在本地 skills 分组上标识当前 IDE 的激活目录
 
 ## 使用方法
@@ -49,14 +49,16 @@ AgentSkills 多 IDE 管理扩展：用于在 Antigravity、Cursor、Trae（以�
 ## 配置说明
 
 Skills 会安装到工作区内“当前 IDE 激活的 skills 目录”：
-- **VSCode**：`.claude/skills`
+- **VSCode**：`.github/skills`
 - **Cursor**：`.cursor/skills`
 - **Trae**：`.trae/skills`
 - **Antigravity**：`.agent/skills`
+- **Qoder**：`.qoder/skills`
+- **Windsurf**：`.windsurf/skills`
+- **CodeBuddy**：`.codebuddy/skills`
 
 仓库扫描会包含隐藏目录中的 skills（例如 `.curated`、`.experimental`）。
 
 ## License
 
 MIT
-

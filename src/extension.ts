@@ -6,7 +6,7 @@ import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
 import { Skill, SkillRepo, LocalSkill } from './types';
 import { copyRecursiveSync } from './utils/fs';
-import { getProjectSkillsDir } from './utils/ide';
+import { detectIde, getProjectSkillsDir } from './utils/ide';
 
 type TreeNode = SkillRepo | Skill | { type: string; name: string; path: string };
 let skillsTreeView: vscode.TreeView<TreeNode>;
@@ -16,6 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Create Output Channel
     const outputChannel = vscode.window.createOutputChannel('Agent Skills Manager');
+    context.subscriptions.push(outputChannel);
 
     // Patch console to redirect to Output Channel
     const originalLog = console.log;
@@ -34,6 +35,11 @@ export function activate(context: vscode.ExtensionContext) {
     };
 
     outputChannel.appendLine('Agent Skills Manager extension activated');
+    outputChannel.appendLine(`IDE detect hint (vscode.env.appName): ${vscode.env.appName}`);
+    outputChannel.appendLine(`ENV AGENTSKILLS_IDE=${process.env.AGENTSKILLS_IDE ?? ''}`);
+    outputChannel.appendLine(`ENV VSCODE_BRAND=${process.env.VSCODE_BRAND ?? ''}`);
+    outputChannel.appendLine(`ENV VSCODE_ENV_APPNAME=${process.env.VSCODE_ENV_APPNAME ?? ''}`);
+    outputChannel.appendLine(`ENV PROG_IDE_NAME=${process.env.PROG_IDE_NAME ?? ''}`);
 
     skillsTreeView = vscode.window.createTreeView('agentskills-skills', {
         treeDataProvider: skillsProvider,
@@ -41,16 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(skillsTreeView);
-
-    // Auto-pull preset repositories on activation
-    vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: 'Initializing preset skills repositories...',
-        cancellable: false
-    }, async () => {
-        await ConfigManager.ensurePresetRepos();
-        skillsProvider.refresh();
-    });
+    skillsProvider.refresh();
 
     skillsTreeView.onDidChangeCheckboxState(e => {
         e.items.forEach(([item, state]) => {
@@ -147,7 +144,7 @@ export function activate(context: vscode.ExtensionContext) {
                 cancellable: false
             }, async (progress) => {
                 const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-                const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
+                const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
 
                 for (let i = 0; i < selected.length; i++) {
                     const skill = selected[i];
@@ -193,7 +190,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (confirm !== 'Yes') return;
 
             const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-            const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
+            const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
 
             for (const skill of selected) {
                 const targetDir = path.join(targetBase, skill.name);
@@ -223,7 +220,7 @@ export function activate(context: vscode.ExtensionContext) {
                 cancellable: false
             }, async () => {
                 const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-                const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
+                const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
                 const targetDir = path.join(targetBase, node.name);
 
                 if (!node.localPath || !fs.existsSync(node.localPath)) {
@@ -251,7 +248,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-            const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
+            const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
             const targetDir = path.join(targetBase, node.name);
 
             if (fs.existsSync(targetDir)) {
@@ -306,7 +303,7 @@ export function activate(context: vscode.ExtensionContext) {
                 cancellable: false
             }, async () => {
                 const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-                const targetBase = getProjectSkillsDir(workspaceRoot, vscode.env.appName);
+                const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
                 const targetDir = path.join(targetBase, node.name);
 
                 if (!fs.existsSync(node.path)) {

@@ -4,7 +4,7 @@ import * as path from 'path';
 import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
 import { Skill, SkillRepo, SkillMatchStatus, LocalSkillsGroup, LocalSkill } from './types';
-import { getProjectSkillsDir } from './utils/ide';
+import { detectIde, getProjectSkillsDir } from './utils/ide';
 import { getCachedSkillHash, clearHashCache } from './utils/skillCompare';
 import { getSkillDirectories } from './utils/skills';
 import { extractYamlField } from './utils/yaml';
@@ -79,7 +79,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
 
     private getInstalledSkillsDir(): string | undefined {
         const root = this.getWorkspaceRoot();
-        return root ? getProjectSkillsDir(root, vscode.env.appName) : undefined;
+        return root ? getProjectSkillsDir(root, detectIde(process.env, vscode.env.appName)) : undefined;
     }
 
     private isSkillInstalled(skillName: string): boolean {
@@ -127,7 +127,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         const root = this.getWorkspaceRoot();
         if (!root) return [];
 
-        const activeProjectSkillsPath = getProjectSkillsDir(root, vscode.env.appName);
+        const activeProjectSkillsPath = getProjectSkillsDir(root, detectIde(process.env, vscode.env.appName));
 
         return getSkillDirectories(root)
             .map(dir => {
@@ -193,9 +193,13 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             );
 
             item.contextValue = 'localSkillsGroup';
+            const root = this.getWorkspaceRoot();
+            const isProjectGroup = root && element.path.startsWith(root);
             item.iconPath = element.isActive
                 ? new vscode.ThemeIcon('layers-active')
-                : new vscode.ThemeIcon(element.icon);
+                : isProjectGroup
+                    ? new vscode.ThemeIcon('layers')
+                    : new vscode.ThemeIcon(element.icon);
             if (element.isActive) {
                 item.description = '[Active]';
             }
@@ -329,6 +333,16 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
                 // Ensure hashes are up to date
                 if (this.installedSkillHashes.size === 0) {
                     this.updateInstalledSkillHashes();
+                }
+
+                if (!GitService.isRepoCloned(element.url)) {
+                    await vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Notification,
+                        title: `Initializing ${element.name}...`,
+                        cancellable: false
+                    }, async () => {
+                        await GitService.pullRepo(element.url, element.branch);
+                    });
                 }
 
                 const skills = await GitService.getSkillsFromRepo(element.url, element.branch);

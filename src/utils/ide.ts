@@ -5,6 +5,9 @@ export enum IdeType {
     CURSOR = 'cursor',
     TRAE = 'trae',
     ANTIGRAVITY = 'antigravity',
+    QODER = 'qoder',
+    WINDSURF = 'windsurf',
+    CODEBUDDY = 'codebuddy',
 }
 
 export interface IdeConfig {
@@ -17,9 +20,17 @@ export const IDE_CONFIGS: Record<IdeType, IdeConfig> = {
         type: IdeType.ANTIGRAVITY,
         skillsDir: join('.agent', 'skills'),
     },
+    [IdeType.CODEBUDDY]: {
+        type: IdeType.CODEBUDDY,
+        skillsDir: join('.codebuddy', 'skills'),
+    },
     [IdeType.CURSOR]: {
         type: IdeType.CURSOR,
         skillsDir: join('.cursor', 'skills'),
+    },
+    [IdeType.QODER]: {
+        type: IdeType.QODER,
+        skillsDir: join('.qoder', 'skills'),
     },
     [IdeType.TRAE]: {
         type: IdeType.TRAE,
@@ -27,16 +38,23 @@ export const IDE_CONFIGS: Record<IdeType, IdeConfig> = {
     },
     [IdeType.VSCODE]: {
         type: IdeType.VSCODE,
-        skillsDir: join('.claude', 'skills'),
+        skillsDir: join('.github', 'skills'),
+    },
+    [IdeType.WINDSURF]: {
+        type: IdeType.WINDSURF,
+        skillsDir: join('.windsurf', 'skills'),
     },
 };
 
 export function resolveIdeType(appName: string): IdeType {
     const lowerAppName = appName.toLowerCase();
 
+    if (lowerAppName.includes('codebuddy')) return IdeType.CODEBUDDY;
     if (lowerAppName.includes('cursor')) return IdeType.CURSOR;
+    if (lowerAppName.includes('qoder')) return IdeType.QODER;
     if (lowerAppName.includes('trae')) return IdeType.TRAE;
     if (lowerAppName.includes('antigravity')) return IdeType.ANTIGRAVITY;
+    if (lowerAppName.includes('windsurf')) return IdeType.WINDSURF;
 
     return IdeType.VSCODE;
 }
@@ -44,7 +62,7 @@ export function resolveIdeType(appName: string): IdeType {
 /**
  * Detect the current IDE based on environment variables.
  */
-export function detectIde(env: NodeJS.ProcessEnv = process.env): IdeType {
+export function detectIde(env: NodeJS.ProcessEnv = process.env, appNameHint?: string): IdeType {
     // Check explicit override first
     if (env.AGENTSKILLS_IDE) {
         const override = env.AGENTSKILLS_IDE.toLowerCase();
@@ -53,9 +71,15 @@ export function detectIde(env: NodeJS.ProcessEnv = process.env): IdeType {
         }
     }
 
-    // Check VSCODE_ENV_APPNAME
+    const brand = env.VSCODE_BRAND || '';
+    if (brand) return resolveIdeType(brand);
+
     const appName = env.VSCODE_ENV_APPNAME || env.PROG_IDE_NAME || '';
-    return resolveIdeType(appName);
+    if (appName) return resolveIdeType(appName);
+
+    if (appNameHint) return resolveIdeType(appNameHint);
+
+    return IdeType.VSCODE;
 }
 
 /**
