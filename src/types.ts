@@ -47,3 +47,38 @@ export interface LocalSkill {
     groupPath: string;      // Parent group directory path
 }
 
+/**
+ * Represents a registry search group in the TreeView
+ */
+export interface RegistrySearchGroup {
+    type: 'registry-group';
+    name: string;
+    query: string;
+    status: 'idle' | 'loading' | 'ready' | 'error';
+    count: number;
+    total: number;
+}
+
+/**
+ * Represents a skill from the registry search results
+ */
+export interface RegistrySkill {
+    type: 'registry-skill';
+    id: string;
+    name: string;
+    namespace: string;
+    sourceUrl: string;
+    description: string;
+    author: string;
+    installs: number;
+    stars: number;
+}
+
+/**
+ * Represents a registry message in the TreeView
+ */
+export interface RegistryMessage {
+    type: 'registry-message';
+    message: string;
+    detail?: string;
+}

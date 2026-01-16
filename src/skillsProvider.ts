@@ -3,14 +3,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
-import { Skill, SkillRepo, SkillMatchStatus, LocalSkillsGroup, LocalSkill } from './types';
+import { Skill, SkillRepo, SkillMatchStatus, LocalSkillsGroup, LocalSkill, RegistrySkill, RegistrySearchGroup, RegistryMessage } from './types';
 import { detectIde, getProjectSkillsDir } from './utils/ide';
 import { getCachedSkillHash, clearHashCache } from './utils/skillCompare';
 import { getSkillDirectories } from './utils/skills';
 import { extractYamlField } from './utils/yaml';
+import { RegistryService, RegistrySkillApiItem } from './services/registry';
 
 // Union type for all tree node types
-type TreeNode = SkillRepo | Skill | LocalSkillsGroup | LocalSkill;
+type TreeNode = SkillRepo | Skill | LocalSkillsGroup | LocalSkill | RegistrySearchGroup | RegistrySkill | RegistryMessage;
 
 // Type guards
 function isSkillRepo(node: TreeNode): node is SkillRepo {
@@ -29,6 +30,30 @@ function isLocalSkill(node: TreeNode): node is LocalSkill {
     return 'type' in node && node.type === 'local-skill';
 }
 
+function isRegistryGroup(node: TreeNode): node is RegistrySearchGroup {
+    return 'type' in node && node.type === 'registry-group';
+}
+
+function isRegistrySkill(node: TreeNode): node is RegistrySkill {
+    return 'type' in node && node.type === 'registry-skill';
+}
+
+function isRegistryMessage(node: TreeNode): node is RegistryMessage {
+    return 'type' in node && node.type === 'registry-message';
+}
+
+type RegistrySearchStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+interface RegistrySearchState {
+    query: string;
+    status: RegistrySearchStatus;
+    results: RegistrySkill[];
+    total: number;
+    limit: number;
+    offset: number;
+    error?: string;
+}
+
 export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     private _onDidChangeTreeData: vscode.EventEmitter<TreeNode | undefined | null | void> = new vscode.EventEmitter<TreeNode | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<TreeNode | undefined | null | void> = this._onDidChangeTreeData.event;
@@ -44,6 +69,25 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     private repoOrder: string[] = [];
     private localGroupOrder: string[] = [];
     private searchQuery: string = '';
+    private readonly registryLimit = 20;
+    private registryState: RegistrySearchState = {
+        query: '',
+        status: 'idle',
+        results: [],
+        total: 0,
+        limit: this.registryLimit,
+        offset: 0
+    };
+    private registryGroup: RegistrySearchGroup = {
+        type: 'registry-group',
+        name: 'Registry Results',
+        query: '',
+        status: 'idle',
+        count: 0,
+        total: 0
+    };
+    private registrySearchId = 0;
+    private registrySearchPromise: Promise<void> | undefined;
     private indexingPromise: Promise<void> | undefined;
     private localGroupByPath: Map<string, LocalSkillsGroup> = new Map();
     private repoByUrl: Map<string, SkillRepo> = new Map();
@@ -96,10 +140,84 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         this.searchQuery = query.trim();
         this._onDidChangeSearchQuery.fire(this.searchQuery);
         this._onDidChangeTreeData.fire();
+        void this.updateRegistryResults(this.searchQuery);
     }
 
     getSearchQuery(): string {
         return this.searchQuery;
+    }
+
+    async waitForRegistrySearch(): Promise<void> {
+        await this.registrySearchPromise;
+    }
+
+    private async updateRegistryResults(query: string): Promise<void> {
+        const trimmed = query.trim();
+        if (!trimmed) {
+            this.registrySearchId += 1;
+            this.registryState = {
+                query: '',
+                status: 'idle',
+                results: [],
+                total: 0,
+                limit: this.registryLimit,
+                offset: 0
+            };
+            this._onDidChangeTreeData.fire();
+            return;
+        }
+
+        const searchId = ++this.registrySearchId;
+        this.registryState = {
+            query: trimmed,
+            status: 'loading',
+            results: [],
+            total: 0,
+            limit: this.registryLimit,
+            offset: 0
+        };
+        this._onDidChangeTreeData.fire();
+
+        const promise = (async () => {
+            try {
+                const response = await RegistryService.searchSkills(trimmed, this.registryLimit, 0);
+                if (searchId !== this.registrySearchId) return;
+                const results = response.skills.map(skill => this.normalizeRegistrySkill(skill));
+                this.registryState = {
+                    query: trimmed,
+                    status: 'ready',
+                    results,
+                    total: response.total,
+                    limit: response.limit,
+                    offset: response.offset
+                };
+            } catch (error) {
+                if (searchId !== this.registrySearchId) return;
+                const message = error instanceof Error ? error.message : String(error);
+                this.registryState = {
+                    query: trimmed,
+                    status: 'error',
+                    results: [],
+                    total: 0,
+                    limit: this.registryLimit,
+                    offset: 0,
+                    error: message
+                };
+                this.warn(`Registry search failed: ${message}`);
+            } finally {
+                if (searchId === this.registrySearchId) {
+                    this._onDidChangeTreeData.fire();
+                }
+            }
+        })();
+
+        this.registrySearchPromise = promise.finally(() => {
+            if (this.registrySearchPromise === promise) {
+                this.registrySearchPromise = undefined;
+            }
+        });
+
+        await this.registrySearchPromise;
     }
 
     checkAllMatchingRepoSkills(): void {
@@ -139,14 +257,16 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         await this.indexingPromise;
     }
 
-    getExpandableRootsForSearch(): Array<SkillRepo | LocalSkillsGroup> {
+    getExpandableRootsForSearch(): Array<SkillRepo | LocalSkillsGroup | RegistrySearchGroup> {
         if (!this.searchQuery) return [];
-        const result: Array<SkillRepo | LocalSkillsGroup> = [];
+        const result: Array<SkillRepo | LocalSkillsGroup | RegistrySearchGroup> = [];
         for (const node of this.lastRootNodes) {
             if (isLocalSkillsGroup(node)) {
                 if (node.isActive || this.getLocalGroupMatchedCount(node) > 0) result.push(node);
             } else if (isSkillRepo(node)) {
                 if (this.getRepoMatchedCount(node) > 0) result.push(node);
+            } else if (isRegistryGroup(node)) {
+                result.push(node);
             }
         }
         return result;
@@ -423,6 +543,40 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             return item;
         }
 
+        // Registry search group
+        if (isRegistryGroup(element)) {
+            const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.Collapsed);
+            item.contextValue = 'registryGroup';
+            item.description = this.getRegistryGroupDescription(element);
+            item.tooltip = this.getRegistryGroupTooltip(element);
+            item.iconPath = new vscode.ThemeIcon('search');
+            return item;
+        }
+
+        // Registry message
+        if (isRegistryMessage(element)) {
+            const item = new vscode.TreeItem(element.message, vscode.TreeItemCollapsibleState.None);
+            item.contextValue = 'registryMessage';
+            item.description = element.detail ?? '';
+            item.iconPath = new vscode.ThemeIcon('info');
+            return item;
+        }
+
+        // Registry skill
+        if (isRegistrySkill(element)) {
+            const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.None);
+            item.contextValue = 'registrySkill';
+            item.description = element.namespace || element.author || '';
+            item.tooltip = this.getRegistrySkillTooltip(element);
+            item.iconPath = new vscode.ThemeIcon('cloud');
+            item.command = {
+                command: 'agentskills.openRegistrySkill',
+                title: 'Open Registry Skill',
+                arguments: [element]
+            };
+            return item;
+        }
+
         // Skill repo
         if (isSkillRepo(element)) {
             const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.Collapsed);
@@ -480,7 +634,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     }
 
     getParent(element: TreeNode): TreeNode | undefined {
-        if (isSkillRepo(element) || isLocalSkillsGroup(element)) return undefined;
+        if (isSkillRepo(element) || isLocalSkillsGroup(element) || isRegistryGroup(element)) return undefined;
 
         if (isSkill(element)) {
             const repo = this.repoByUrl.get(element.repoUrl);
@@ -488,6 +642,10 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             const fallback = ConfigManager.getRepos().find(r => r.url === element.repoUrl);
             if (fallback) return this.reconcileRepo(fallback);
             return undefined;
+        }
+
+        if (isRegistrySkill(element) || isRegistryMessage(element)) {
+            return this.getRegistryGroup();
         }
 
         if (isLocalSkill(element)) {
@@ -512,6 +670,14 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         if (isLocalSkillsGroup(element)) {
             const skills = this.localSkillsIndex.get(element.path) ?? this.getLocalSkillsFromGroup(element);
             return this.filterSkills(skills);
+        }
+
+        // Registry search children
+        if (isRegistryGroup(element)) {
+            if (this.registryState.status === 'ready' && this.registryState.results.length > 0) {
+                return this.registryState.results;
+            }
+            return this.getRegistryMessages();
         }
 
         // Skill repo children
@@ -606,6 +772,49 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             this.skillCache.set(this.getSkillKey(s), s);
         });
         return skills;
+    }
+
+    private normalizeRegistrySkill(skill: RegistrySkillApiItem): RegistrySkill {
+        return {
+            type: 'registry-skill',
+            id: String(skill.id ?? skill.namespace ?? skill.name ?? ''),
+            name: skill.name || skill.namespace || 'Unknown',
+            namespace: skill.namespace ?? '',
+            sourceUrl: skill.sourceUrl ?? '',
+            description: skill.description ?? '',
+            author: skill.author ?? '',
+            installs: Number(skill.installs ?? 0),
+            stars: Number(skill.stars ?? 0)
+        };
+    }
+
+    private getRegistryGroup(): RegistrySearchGroup | undefined {
+        if (!this.searchQuery) return undefined;
+        this.registryGroup.query = this.searchQuery;
+        this.registryGroup.status = this.registryState.status;
+        this.registryGroup.count = this.registryState.results.length;
+        this.registryGroup.total = this.registryState.total;
+        return this.registryGroup;
+    }
+
+    private getRegistryMessages(): RegistryMessage[] {
+        if (this.registryState.status === 'loading') {
+            return [{ type: 'registry-message', message: 'Loading registry results...' }];
+        }
+
+        if (this.registryState.status === 'error') {
+            return [{
+                type: 'registry-message',
+                message: 'Registry search failed.',
+                detail: this.registryState.error ?? ''
+            }];
+        }
+
+        if (this.registryState.status === 'ready' && this.registryState.results.length === 0) {
+            return [{ type: 'registry-message', message: 'No registry results.' }];
+        }
+
+        return [];
     }
 
     private filterSkills<T extends Skill | LocalSkill>(skills: T[]): T[] {
@@ -704,21 +913,29 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
             rawRepos.map(r => this.reconcileRepo(r))
         );
 
-        const rootNodes: TreeNode[] = [];
         const activeLocal = localGroups.filter(g => g.isActive);
         const otherLocal = localGroups.filter(g => !g.isActive);
-        rootNodes.push(...activeLocal, ...otherLocal);
+        const localRoots: TreeNode[] = [];
+        localRoots.push(...activeLocal, ...otherLocal);
+        const registryGroup = this.getRegistryGroup();
 
         if (this.searchQuery) {
-            const filteredLocal = rootNodes.filter(node => {
+            const filteredLocal = localRoots.filter(node => {
                 if (!isLocalSkillsGroup(node)) return true;
                 if (node.isActive) return true;
                 return this.getLocalGroupMatchedCount(node) > 0;
             });
             const filteredRepos = repos.filter(r => this.getRepoMatchedCount(r) > 0);
-            return filteredLocal.concat(filteredRepos);
+            const results: TreeNode[] = [];
+            results.push(...filteredLocal);
+            if (registryGroup) results.push(registryGroup);
+            results.push(...filteredRepos);
+            return results;
         }
 
+        const rootNodes: TreeNode[] = [];
+        rootNodes.push(...localRoots);
+        if (registryGroup) rootNodes.push(registryGroup);
         return rootNodes.concat(repos);
     }
 
@@ -778,6 +995,53 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         lines.push('');
         lines.push(`Total: ${total}`);
         if (matched !== undefined) lines.push(`Matched: ${matched}`);
+
+        const md = new vscode.MarkdownString(lines.join('\n'));
+        md.isTrusted = true;
+        return md;
+    }
+
+    private getRegistryGroupDescription(group: RegistrySearchGroup): string {
+        if (group.status === 'loading') return 'Loading...';
+        if (group.status === 'error') return 'Failed';
+        if (group.total > 0) return `${group.count}/${group.total}`;
+        if (group.status === 'ready') return `${group.count}`;
+        return '';
+    }
+
+    private getRegistryGroupTooltip(group: RegistrySearchGroup): vscode.MarkdownString {
+        const lines: string[] = [];
+        lines.push(`**${group.name}**`);
+        lines.push('');
+        lines.push(`Query: ${group.query}`);
+        lines.push(`Status: ${group.status}`);
+        if (group.total) {
+            lines.push(`Results: ${group.count}/${group.total}`);
+        } else {
+            lines.push(`Results: ${group.count}`);
+        }
+
+        const md = new vscode.MarkdownString(lines.join('\n'));
+        md.isTrusted = true;
+        return md;
+    }
+
+    private getRegistrySkillTooltip(skill: RegistrySkill): vscode.MarkdownString {
+        const lines: string[] = [];
+        lines.push(`**${skill.name}**`);
+        lines.push('');
+        if (skill.description) {
+            lines.push(skill.description);
+            lines.push('');
+        }
+        if (skill.namespace) lines.push(`Namespace: ${skill.namespace}`);
+        if (skill.author) lines.push(`Author: ${skill.author}`);
+        lines.push(`Installs: ${skill.installs}`);
+        lines.push(`Stars: ${skill.stars}`);
+        if (skill.sourceUrl) {
+            lines.push('');
+            lines.push(`[Source](${skill.sourceUrl})`);
+        }
 
         const md = new vscode.MarkdownString(lines.join('\n'));
         md.isTrusted = true;

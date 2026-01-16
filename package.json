@@ -60,6 +60,16 @@
                 "icon": "$(close)"
             },
             {
+                "command": "agentskills.openRegistrySkill",
+                "title": "Open Skill Source",
+                "icon": "$(link-external)"
+            },
+            {
+                "command": "agentskills.addRegistryRepo",
+                "title": "Add Repository",
+                "icon": "$(add)"
+            },
+            {
                 "command": "agentskills.refresh",
                 "title": "Refresh Skills",
                 "icon": "$(refresh)"
@@ -176,6 +186,16 @@
                 }
             ],
             "view/item/context": [
+                {
+                    "command": "agentskills.openRegistrySkill",
+                    "when": "viewItem == registrySkill",
+                    "group": "inline"
+                },
+                {
+                    "command": "agentskills.addRegistryRepo",
+                    "when": "viewItem == registrySkill",
+                    "group": "navigation@1"
+                },
                 {
                     "command": "agentskills.pullRepo",
                     "when": "viewItem == skillRepo",
