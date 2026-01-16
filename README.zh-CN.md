@@ -18,33 +18,19 @@ AgentSkills 多 IDE 管理扩展：用于在 Antigravity、CodeBuddy、Cursor、
 3. 展开仓库浏览可用 skills
 4. 勾选需要的 skills，点击 **Install**
 
-默认内置的预置仓库：
-- `https://github.com/anthropics/skills.git`
-- `https://github.com/openai/skills`
-- `https://github.com/skillcreatorai/Ai-Agent-Skills`
-- `https://github.com/obra/superpowers`
-- `https://github.com/ComposioHQ/awesome-claude-skills.git`
-
 ## Skill 仓库推荐
 
-来自 [heilcheng/awesome-agent-skills](https://github.com/heilcheng/awesome-agent-skills) 的整理。
+扩展默认内置的预置仓库：
 
 | 仓库 | 说明 |
 |------|------|
-| [anthropics/skills](https://github.com/anthropics/skills) | Anthropic 官方技能集合（文档编辑、数据分析等） |
-| [openai/skills](https://github.com/openai/skills) | OpenAI Codex 官方 skills 目录 |
-| [huggingface/skills](https://github.com/huggingface/skills) | HuggingFace skills（兼容 Claude、Codex、Gemini） |
-| [skillcreatorai/Ai-Agent-Skills](https://github.com/skillcreatorai/Ai-Agent-Skills) | SkillCreator.ai skills 集合 |
-| [karanb192/awesome-claude-skills](https://github.com/karanb192/awesome-claude-skills) | 50+ Claude Code/Claude.ai skills |
-| [shajith003/awesome-claude-skills](https://github.com/shajith003/awesome-claude-skills) | 专业化 skills |
-| [GuDaStudio/skills](https://github.com/GuDaStudio/skills) | 多智能体协作 skills |
-| [DougTrajano/pydantic-ai-skills](https://github.com/DougTrajano/pydantic-ai-skills) | Pydantic AI 集成 skills |
-| [OmidZamani/dspy-skills](https://github.com/OmidZamani/dspy-skills) | DSPy skills |
-| [ponderous-dustiness314/awesome-claude-skills](https://github.com/ponderous-dustiness314/awesome-claude-skills) | 文档编辑、数据分析、项目管理 |
-| [hikanner/agent-skills](https://github.com/hikanner/agent-skills) | Claude Agent Skills 精选集 |
-| [gradion-ai/freeact-skills](https://github.com/gradion-ai/freeact-skills) | Freeact skills |
-| [gotalab/skillport](https://github.com/gotalab/skillport) | 通过 CLI 或 MCP 分发 skills |
-| [mhattingpete/claude-skills-marketplace](https://github.com/mhattingpete/claude-skills-marketplace) | Git/代码审查/测试 skills |
+| [anthropics/skills](https://github.com/anthropics/skills) | Anthropic 官方 skills 集合 |
+| [openai/skills](https://github.com/openai/skills) | OpenAI 官方 skills 目录 |
+| [skillcreatorai/Ai-Agent-Skills](https://github.com/skillcreatorai/Ai-Agent-Skills) | 社区 skills 集合 |
+| [obra/superpowers](https://github.com/obra/superpowers) | Superpowers skills 集合 |
+| [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) | awesome-claude-skills 精选集合 |
+
+更多仓库可参考 [heilcheng/awesome-agent-skills](https://github.com/heilcheng/awesome-agent-skills)。
 
 ## 配置说明
 
