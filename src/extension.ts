@@ -4,11 +4,11 @@ import * as fs from 'fs';
 import { SkillsProvider } from './skillsProvider';
 import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
-import { Skill, SkillRepo, LocalSkill, LocalSkillsGroup } from './types';
+import { Skill, SkillRepo, LocalSkill, LocalSkillsGroup, RegistrySkill, RegistrySearchGroup, RegistryMessage } from './types';
 import { copyRecursiveSync } from './utils/fs';
 import { detectIde, getProjectSkillsDir } from './utils/ide';
 
-type TreeNode = SkillRepo | Skill | LocalSkillsGroup | LocalSkill;
+type TreeNode = SkillRepo | Skill | LocalSkillsGroup | LocalSkill | RegistrySearchGroup | RegistrySkill | RegistryMessage;
 let skillsTreeView: vscode.TreeView<TreeNode>;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -161,6 +161,43 @@ export function activate(context: vscode.ExtensionContext) {
             skillsProvider.setSearchQuery('');
             void vscode.commands.executeCommand('workbench.actions.treeView.agentskills-skills.collapseAll');
         }),
+        vscode.commands.registerCommand('agentskills.openRegistrySkill', async (node: RegistrySkill) => {
+            if (!node || node.type !== 'registry-skill') {
+                vscode.window.showErrorMessage('Please select a registry skill.');
+                return;
+            }
+
+            const url = node.sourceUrl?.trim();
+            if (!url) {
+                vscode.window.showWarningMessage('No source URL available for this registry skill.');
+                return;
+            }
+
+            await vscode.env.openExternal(vscode.Uri.parse(url));
+        }),
+        vscode.commands.registerCommand('agentskills.addRegistryRepo', async (node: RegistrySkill) => {
+            if (!node || node.type !== 'registry-skill') {
+                vscode.window.showErrorMessage('Please select a registry skill.');
+                return;
+            }
+
+            const url = node.sourceUrl?.trim();
+            if (!url) {
+                vscode.window.showWarningMessage('No source URL available for this registry skill.');
+                return;
+            }
+
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Adding repository...',
+                cancellable: false
+            }, async () => {
+                await ConfigManager.addRepo(url);
+                skillsProvider.refresh();
+            });
+
+            vscode.window.showInformationMessage(`Added repository for "${node.name}".`);
+        }),
         vscode.commands.registerCommand('agentskills.selectAllInRepo', async (node: SkillRepo) => {
             if (!node || !('url' in node)) return;
             await skillsProvider.waitForIndexing();
@@ -237,7 +274,7 @@ export function activate(context: vscode.ExtensionContext) {
             const checked = skillsProvider.getCheckedSkills();
             const selected = checked.length > 0
                 ? checked
-                : (skillsTreeView.selection.filter(item => !('url' in item)) as Skill[]);
+                : (skillsTreeView.selection.filter(item => 'repoUrl' in item) as Skill[]);
 
             if (selected.length === 0) {
                 vscode.window.showWarningMessage('Please select skills to install (use checkboxes).');
@@ -281,7 +318,7 @@ export function activate(context: vscode.ExtensionContext) {
             const checked = skillsProvider.getCheckedSkills();
             const selected = checked.length > 0
                 ? checked
-                : (skillsTreeView.selection.filter(item => !('url' in item)) as Skill[]);
+                : (skillsTreeView.selection.filter(item => 'repoUrl' in item) as Skill[]);
 
             if (selected.length === 0) {
                 vscode.window.showWarningMessage('Please select skills to delete.');

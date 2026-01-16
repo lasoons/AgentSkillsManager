@@ -8,6 +8,7 @@ AgentSkills multi-IDE management extension: browse and install skill repositorie
 
 - **Repository Management**: Add, remove, and switch branches of skill repositories
 - **Skill Installation**: Install skills into the active IDE skills directory
+- **Registry Search**: Search skills from claude-plugins.dev and add repositories
 - **Multi-IDE Support**: Works with VSCode, Cursor, Trae, Antigravity, Qoder, Windsurf, and CodeBuddy
 - **Active Skills Directory**: The local skills group shows which directory is active
 
@@ -17,6 +18,7 @@ AgentSkills multi-IDE management extension: browse and install skill repositorie
 2. Click **+** to add a skill repository (e.g., `https://github.com/anthropics/skills`)
 3. Expand the repository to browse available skills
 4. Check the skills you want, then click **Install**
+5. Use **Search** to filter local repos and see Registry Results
 
 ## Skill Collections
 
