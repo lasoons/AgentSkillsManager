@@ -4,28 +4,39 @@ import * as fs from 'fs';
 import { SkillsProvider } from './skillsProvider';
 import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
-import { Skill, SkillRepo, LocalSkill } from './types';
+import { Skill, SkillRepo, LocalSkill, LocalSkillsGroup } from './types';
 import { copyRecursiveSync } from './utils/fs';
 import { detectIde, getProjectSkillsDir } from './utils/ide';
 
-type TreeNode = SkillRepo | Skill | { type: string; name: string; path: string };
+type TreeNode = SkillRepo | Skill | LocalSkillsGroup | LocalSkill;
 let skillsTreeView: vscode.TreeView<TreeNode>;
 
 export function activate(context: vscode.ExtensionContext) {
-    const skillsProvider = new SkillsProvider();
-
-    // Create Output Channel
     const outputChannel = vscode.window.createOutputChannel('Agent Skills Manager');
     context.subscriptions.push(outputChannel);
 
-    // Patch console to redirect to Output Channel
     const originalLog = console.log;
+    const originalInfo = console.info;
+    const originalWarn = console.warn;
     const originalError = console.error;
+    const originalDebug = console.debug;
 
     console.log = (...args: any[]) => {
         const message = args.map(arg => String(arg)).join(' ');
         outputChannel.appendLine(`[INFO] ${message}`);
         originalLog.apply(console, args);
+    };
+
+    console.info = (...args: any[]) => {
+        const message = args.map(arg => String(arg)).join(' ');
+        outputChannel.appendLine(`[INFO] ${message}`);
+        originalInfo.apply(console, args);
+    };
+
+    console.warn = (...args: any[]) => {
+        const message = args.map(arg => String(arg)).join(' ');
+        outputChannel.appendLine(`[WARN] ${message}`);
+        originalWarn.apply(console, args);
     };
 
     console.error = (...args: any[]) => {
@@ -34,20 +45,88 @@ export function activate(context: vscode.ExtensionContext) {
         originalError.apply(console, args);
     };
 
-    outputChannel.appendLine('Agent Skills Manager extension activated');
-    outputChannel.appendLine(`IDE detect hint (vscode.env.appName): ${vscode.env.appName}`);
-    outputChannel.appendLine(`ENV AGENTSKILLS_IDE=${process.env.AGENTSKILLS_IDE ?? ''}`);
-    outputChannel.appendLine(`ENV VSCODE_BRAND=${process.env.VSCODE_BRAND ?? ''}`);
-    outputChannel.appendLine(`ENV VSCODE_ENV_APPNAME=${process.env.VSCODE_ENV_APPNAME ?? ''}`);
-    outputChannel.appendLine(`ENV PROG_IDE_NAME=${process.env.PROG_IDE_NAME ?? ''}`);
+    console.debug = (...args: any[]) => {
+        const message = args.map(arg => String(arg)).join(' ');
+        outputChannel.appendLine(`[DEBUG] ${message}`);
+        originalDebug.apply(console, args);
+    };
+
+    outputChannel.appendLine('[INFO] Agent Skills Manager extension activated');
+    outputChannel.appendLine(`[INFO] IDE detect hint (vscode.env.appName): ${vscode.env.appName}`);
+    outputChannel.appendLine(`[INFO] ENV AGENTSKILLS_IDE=${process.env.AGENTSKILLS_IDE ?? ''}`);
+    outputChannel.appendLine(`[INFO] ENV VSCODE_BRAND=${process.env.VSCODE_BRAND ?? ''}`);
+    outputChannel.appendLine(`[INFO] ENV VSCODE_ENV_APPNAME=${process.env.VSCODE_ENV_APPNAME ?? ''}`);
+    outputChannel.appendLine(`[INFO] ENV PROG_IDE_NAME=${process.env.PROG_IDE_NAME ?? ''}`);
+
+    outputChannel.appendLine('[INFO] Creating SkillsProvider');
+    const skillsProvider = new SkillsProvider(context.globalState, outputChannel);
+
+    const dragMimeType = 'application/vnd.agentskills.node';
+    const dragAndDropController: vscode.TreeDragAndDropController<TreeNode> = {
+        dragMimeTypes: [dragMimeType],
+        dropMimeTypes: [dragMimeType],
+        handleDrag: (source, dataTransfer, _token) => {
+            const first = source[0];
+            if (!first) return;
+
+            if ('type' in first && first.type === 'local-group') {
+                const group = first as LocalSkillsGroup;
+                if (group.isActive) return;
+                dataTransfer.set(dragMimeType, new vscode.DataTransferItem(JSON.stringify({
+                    kind: 'localGroup',
+                    key: group.path
+                })));
+                return;
+            }
+
+            if ('url' in first) {
+                const repo = first as SkillRepo;
+                dataTransfer.set(dragMimeType, new vscode.DataTransferItem(JSON.stringify({
+                    kind: 'repo',
+                    key: repo.url
+                })));
+            }
+        },
+        handleDrop: (_target, dataTransfer, _token) => {
+            const item = dataTransfer.get(dragMimeType);
+            const raw = item?.value;
+            if (typeof raw !== 'string') return;
+
+            const parsed = JSON.parse(raw) as { kind: 'repo' | 'localGroup'; key: string };
+            const target = _target as any | undefined;
+
+            if (parsed.kind === 'repo') {
+                const targetKey = target && ('url' in target) ? String(target.url) : undefined;
+                skillsProvider.reorderAfterDrop('repo', parsed.key, targetKey);
+                return;
+            }
+
+            if (parsed.kind === 'localGroup') {
+                const isTargetGroup = target && target.type === 'local-group';
+                const targetKey = isTargetGroup && !target.isActive ? String(target.path) : undefined;
+                skillsProvider.reorderAfterDrop('localGroup', parsed.key, targetKey);
+            }
+        }
+    };
 
     skillsTreeView = vscode.window.createTreeView('agentskills-skills', {
         treeDataProvider: skillsProvider,
-        canSelectMany: true
+        canSelectMany: true,
+        dragAndDropController
     });
 
     context.subscriptions.push(skillsTreeView);
+    outputChannel.appendLine('[INFO] Skills TreeView created');
+    outputChannel.appendLine('[INFO] Starting initial refresh/indexing');
     skillsProvider.refresh();
+
+    const updateSearchUi = (query: string) => {
+        skillsTreeView.message = query ? `Filter: ${query}` : undefined;
+        void vscode.commands.executeCommand('setContext', 'agentskills.hasFilter', Boolean(query));
+    };
+
+    updateSearchUi(skillsProvider.getSearchQuery());
+    context.subscriptions.push(skillsProvider.onDidChangeSearchQuery(updateSearchUi));
 
     skillsTreeView.onDidChangeCheckboxState(e => {
         e.items.forEach(([item, state]) => {
@@ -60,6 +139,38 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('agentskills.refresh', () => skillsProvider.refresh()),
+        vscode.commands.registerCommand('agentskills.search', async () => {
+            const query = await vscode.window.showInputBox({
+                placeHolder: 'Search skills by name or description',
+                prompt: 'Search Skills',
+                value: skillsProvider.getSearchQuery()
+            });
+            if (query === undefined) return;
+            skillsProvider.setSearchQuery(query);
+
+            if (query.trim()) {
+                await skillsProvider.waitForIndexing();
+                await skillsProvider.recomputeRootNodesForReveal();
+                await vscode.commands.executeCommand('workbench.actions.treeView.agentskills-skills.collapseAll');
+                for (const node of skillsProvider.getExpandableRootsForSearch()) {
+                    await skillsTreeView.reveal(node as any, { expand: true, select: false, focus: false });
+                }
+            }
+        }),
+        vscode.commands.registerCommand('agentskills.clearSearch', () => {
+            skillsProvider.setSearchQuery('');
+            void vscode.commands.executeCommand('workbench.actions.treeView.agentskills-skills.collapseAll');
+        }),
+        vscode.commands.registerCommand('agentskills.selectAllInRepo', async (node: SkillRepo) => {
+            if (!node || !('url' in node)) return;
+            await skillsProvider.waitForIndexing();
+            skillsProvider.checkAllSkillsInRepo(node);
+        }),
+        vscode.commands.registerCommand('agentskills.clearInRepo', async (node: SkillRepo) => {
+            if (!node || !('url' in node)) return;
+            await skillsProvider.waitForIndexing();
+            skillsProvider.clearCheckedSkillsInRepo(node);
+        }),
 
         vscode.commands.registerCommand('agentskills.addRepo', async () => {
             const url = await vscode.window.showInputBox({

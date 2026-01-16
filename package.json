@@ -2,7 +2,7 @@
     "name": "agent-skills-manager",
     "displayName": "AgentSkillsManager",
     "description": "Manage, install, and sync Agent Skills (Claude Code compatible skills) from VSCode.",
-    "version": "0.1.6",
+    "version": "0.5.0",
     "publisher": "whyuds",
     "repository": {
         "type": "git",
@@ -50,9 +50,29 @@
                 "icon": "$(add)"
             },
             {
+                "command": "agentskills.search",
+                "title": "Search Skills",
+                "icon": "$(search)"
+            },
+            {
+                "command": "agentskills.clearSearch",
+                "title": "Clear Filter",
+                "icon": "$(close)"
+            },
+            {
                 "command": "agentskills.refresh",
                 "title": "Refresh Skills",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "agentskills.selectAllInRepo",
+                "title": "Select All (Repo)",
+                "icon": "$(checklist)"
+            },
+            {
+                "command": "agentskills.clearInRepo",
+                "title": "Clear (Repo)",
+                "icon": "$(clear-all)"
             },
             {
                 "command": "agentskills.removeRepo",
@@ -140,6 +160,16 @@
                     "group": "navigation@3"
                 },
                 {
+                    "command": "agentskills.search",
+                    "when": "view == agentskills-skills",
+                    "group": "navigation@4"
+                },
+                {
+                    "command": "agentskills.clearSearch",
+                    "when": "view == agentskills-skills && agentskills.hasFilter",
+                    "group": "navigation@4.1"
+                },
+                {
                     "command": "agentskills.refresh",
                     "when": "view == agentskills-skills",
                     "group": "navigation@5"
@@ -150,6 +180,16 @@
                     "command": "agentskills.pullRepo",
                     "when": "viewItem == skillRepo",
                     "group": "inline"
+                },
+                {
+                    "command": "agentskills.selectAllInRepo",
+                    "when": "viewItem == skillRepo",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "agentskills.clearInRepo",
+                    "when": "viewItem == skillRepo",
+                    "group": "navigation@2"
                 },
                 {
                     "command": "agentskills.switchBranch",

@@ -2,6 +2,7 @@ import * as cp from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as dns from 'dns';
 import { Skill } from '../types';
 import { scanSkillsFromDir, getRepoCachePath } from './skillScanner';
 
@@ -44,6 +45,36 @@ export class GitService {
             console.error(`Failed to list branches for ${url}`, e);
             return [];
         }
+    }
+
+    static async checkRepoConnectivity(url: string, timeoutMs: number = 200): Promise<boolean> {
+        const host = this.getRepoHost(url);
+        if (!host) return false;
+
+        const lookup = new Promise<boolean>((resolve) => {
+            dns.lookup(host, { all: false }, (err) => resolve(!err));
+        });
+
+        const timeout = new Promise<boolean>((resolve) => {
+            setTimeout(() => resolve(false), timeoutMs);
+        });
+
+        return Promise.race([lookup, timeout]);
+    }
+
+    static getRepoHost(url: string): string | undefined {
+        const trimmed = url.trim();
+        if (!trimmed) return undefined;
+
+        try {
+            const parsed = new URL(trimmed);
+            if (parsed.hostname) return parsed.hostname;
+        } catch { }
+
+        const scpLike = trimmed.match(/^(?:.+@)?([^:\/]+):.+$/);
+        if (scpLike?.[1]) return scpLike[1];
+
+        return undefined;
     }
 
     static async ensureRepoCloned(url: string, branch?: string): Promise<string> {
