@@ -57,7 +57,7 @@
             {
                 "command": "agentskills.clearSearch",
                 "title": "Clear Filter",
-                "icon": "$(close)"
+                "icon": "$(clear-all)"
             },
             {
                 "command": "agentskills.refresh",
