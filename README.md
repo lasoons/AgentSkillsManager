@@ -1,6 +1,6 @@
 # Agent Skills Manager
 
-AgentSkills multi-IDE management extension: browse and install skill repositories for Antigravity, CodeBuddy, Cursor, Qoder, Trae, Windsurf (and VS Code).
+AgentSkills multi-IDE management extension: browse and install skill repositories for Antigravity, CodeBuddy, Cursor, Qoder, Trae, Windsurf (and VS Code), and search a cloud catalog (~58K skills) from https://claude-plugins.dev/.
 
 ![image](https://raw.githubusercontent.com/lasoons/AgentSkillsManager/refs/heads/main/resources/image.png)
 
@@ -8,6 +8,7 @@ AgentSkills multi-IDE management extension: browse and install skill repositorie
 
 - **Repository Management**: Add, remove, and switch branches of skill repositories
 - **Skill Installation**: Install skills into the active IDE skills directory
+- **Cloud Skills Search (~58K)**: Search the cloud catalog from https://claude-plugins.dev/ and install with one click/Enter
 - **Multi-IDE Support**: Works with VSCode, Cursor, Trae, Antigravity, Qoder, Windsurf, and CodeBuddy
 - **Active Skills Directory**: The local skills group shows which directory is active
 
@@ -17,6 +18,7 @@ AgentSkills multi-IDE management extension: browse and install skill repositorie
 2. Click **+** to add a skill repository (e.g., `https://github.com/anthropics/skills`)
 3. Expand the repository to browse available skills
 4. Check the skills you want, then click **Install**
+5. Click the search icon to search cloud skills, then press **Enter** (or click **Install**) to download and install
 
 ## Skill Collections
 
