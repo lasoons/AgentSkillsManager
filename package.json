@@ -2,7 +2,7 @@
     "name": "agent-skills-manager",
     "displayName": "AgentSkillsManager",
     "description": "Manage, install, and sync Agent Skills (Claude Code compatible skills) from VSCode.",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "publisher": "whyuds",
     "repository": {
         "type": "git",
@@ -238,8 +238,11 @@
         "package": "npm run check-types && node esbuild.js --production",
         "check-types": "tsc --noEmit"
     },
-    "dependencies": {},
+    "dependencies": {
+        "adm-zip": "^0.5.12"
+    },
     "devDependencies": {
+        "@types/adm-zip": "^0.5.7",
         "@types/node": "^20.0.0",
         "@types/vscode": "^1.96.0",
         "esbuild": "^0.24.0",

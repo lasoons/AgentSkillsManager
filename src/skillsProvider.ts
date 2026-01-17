@@ -56,7 +56,6 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         this.log('SkillsProvider initialized');
         this.repoOrder = this.memento?.get<string[]>('agentskills.repoOrder') ?? [];
         this.localGroupOrder = this.memento?.get<string[]>('agentskills.localGroupOrder') ?? [];
-        void this.buildIndex();
     }
 
     refresh(): void {
@@ -64,6 +63,14 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         this.updateInstalledSkillHashes();
         this._onDidChangeTreeData.fire();
         void this.buildIndex();
+    }
+
+    refreshInstalledAndLocal(): void {
+        clearHashCache();
+        this.updateInstalledSkillHashes();
+        this.recomputeRepoSkillStates();
+        this.rebuildLocalIndex();
+        this._onDidChangeTreeData.fire();
     }
 
     setChecked(skill: Skill, checked: boolean): void {
@@ -89,7 +96,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
 
     clearSelection(): void {
         this.checkedSkills.clear();
-        this.refresh();
+        this._onDidChangeTreeData.fire();
     }
 
     setSearchQuery(query: string): void {
@@ -133,6 +140,25 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     uncheckAllSkills(): void {
         this.checkedSkills.clear();
         this._onDidChangeTreeData.fire();
+    }
+
+    private rebuildLocalIndex(): void {
+        const localGroups = this.getLocalSkillsGroups();
+        this.localSkillsIndex.clear();
+        for (const group of localGroups) {
+            const skills = this.getLocalSkillsFromGroup(group);
+            this.localSkillsIndex.set(group.path, skills);
+        }
+    }
+
+    private recomputeRepoSkillStates(): void {
+        for (const skills of this.repoSkillsIndex.values()) {
+            for (const s of skills) {
+                s.matchStatus = this.getSkillMatchStatus(s);
+                s.installed = s.matchStatus === SkillMatchStatus.Matched;
+                this.skillCache.set(this.getSkillKey(s), s);
+            }
+        }
     }
 
     async waitForIndexing(): Promise<void> {
