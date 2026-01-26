@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SkillRepo } from './types';
 import { GitService } from './services/git';
+import { getLogger } from './utils/logger';
 
 // Preset repositories that are always included
 const PRESET_REPOS: SkillRepo[] = [
@@ -10,6 +11,7 @@ const PRESET_REPOS: SkillRepo[] = [
     { url: 'https://github.com/obra/superpowers.git', name: 'obra/superpowers', isPreset: true },
     { url: 'https://github.com/ComposioHQ/awesome-claude-skills.git', name: 'ComposioHQ/awesome-claude-skills', isPreset: true }
 ];
+const logger = getLogger('ConfigManager');
 
 export class ConfigManager {
     static getRepos(): SkillRepo[] {
@@ -25,7 +27,7 @@ export class ConfigManager {
             try {
                 await GitService.pullRepo(repo.url, repo.branch);
             } catch (e) {
-                console.error(`Failed to pull preset repo ${repo.name}:`, e);
+                logger.error(`Failed to pull preset repo ${repo.name}:`, e);
             }
         }
     }

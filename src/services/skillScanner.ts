@@ -3,8 +3,10 @@ import * as path from 'path';
 import * as os from 'os';
 import { Skill } from '../types';
 import { extractYamlField, hasValidFrontmatter } from '../utils/yaml';
+import { getLogger } from '../utils/logger';
 
 const CACHE_DIR = path.join(os.tmpdir(), 'agentskills-git-cache');
+const logger = getLogger('SkillScanner');
 
 /**
  * Scan skills from a local directory
@@ -42,7 +44,7 @@ export function scanSkillsFromDir(repoPath: string, repoUrl: string): Skill[] {
                 }
             }
         } catch (e) {
-            console.error(`Error scanning dir ${dir}`, e);
+            logger.error(`Error scanning dir ${dir}`, e);
         }
     };
 

@@ -10,9 +10,11 @@ import { GitService } from './services/git';
 import { Skill, SkillRepo, LocalSkill, LocalSkillsGroup } from './types';
 import { copyRecursiveSync } from './utils/fs';
 import { detectIde, getProjectSkillsDir } from './utils/ide';
+import { getLogger, setLoggerOutputChannel } from './utils/logger';
 
 type TreeNode = SkillRepo | Skill | LocalSkillsGroup | LocalSkill;
 let skillsTreeView: vscode.TreeView<TreeNode>;
+const logger = getLogger('AgentSkillsManager');
 
 interface RemoteSkill {
     id: string;
@@ -37,51 +39,16 @@ type RemoteSkillPickItem = vscode.QuickPickItem & { itemType: 'remoteSkill'; ski
 export function activate(context: vscode.ExtensionContext) {
     const outputChannel = vscode.window.createOutputChannel('Agent Skills Manager');
     context.subscriptions.push(outputChannel);
+    setLoggerOutputChannel(outputChannel);
 
-    const originalLog = console.log;
-    const originalInfo = console.info;
-    const originalWarn = console.warn;
-    const originalError = console.error;
-    const originalDebug = console.debug;
+    logger.info('Agent Skills Manager extension activated');
+    logger.info(`IDE detect hint (vscode.env.appName): ${vscode.env.appName}`);
+    logger.info(`ENV AGENTSKILLS_IDE=${process.env.AGENTSKILLS_IDE ?? ''}`);
+    logger.info(`ENV VSCODE_BRAND=${process.env.VSCODE_BRAND ?? ''}`);
+    logger.info(`ENV VSCODE_ENV_APPNAME=${process.env.VSCODE_ENV_APPNAME ?? ''}`);
+    logger.info(`ENV PROG_IDE_NAME=${process.env.PROG_IDE_NAME ?? ''}`);
 
-    console.log = (...args: any[]) => {
-        const message = args.map(arg => String(arg)).join(' ');
-        outputChannel.appendLine(`[INFO] ${message}`);
-        originalLog.apply(console, args);
-    };
-
-    console.info = (...args: any[]) => {
-        const message = args.map(arg => String(arg)).join(' ');
-        outputChannel.appendLine(`[INFO] ${message}`);
-        originalInfo.apply(console, args);
-    };
-
-    console.warn = (...args: any[]) => {
-        const message = args.map(arg => String(arg)).join(' ');
-        outputChannel.appendLine(`[WARN] ${message}`);
-        originalWarn.apply(console, args);
-    };
-
-    console.error = (...args: any[]) => {
-        const message = args.map(arg => String(arg)).join(' ');
-        outputChannel.appendLine(`[ERROR] ${message}`);
-        originalError.apply(console, args);
-    };
-
-    console.debug = (...args: any[]) => {
-        const message = args.map(arg => String(arg)).join(' ');
-        outputChannel.appendLine(`[DEBUG] ${message}`);
-        originalDebug.apply(console, args);
-    };
-
-    outputChannel.appendLine('[INFO] Agent Skills Manager extension activated');
-    outputChannel.appendLine(`[INFO] IDE detect hint (vscode.env.appName): ${vscode.env.appName}`);
-    outputChannel.appendLine(`[INFO] ENV AGENTSKILLS_IDE=${process.env.AGENTSKILLS_IDE ?? ''}`);
-    outputChannel.appendLine(`[INFO] ENV VSCODE_BRAND=${process.env.VSCODE_BRAND ?? ''}`);
-    outputChannel.appendLine(`[INFO] ENV VSCODE_ENV_APPNAME=${process.env.VSCODE_ENV_APPNAME ?? ''}`);
-    outputChannel.appendLine(`[INFO] ENV PROG_IDE_NAME=${process.env.PROG_IDE_NAME ?? ''}`);
-
-    outputChannel.appendLine('[INFO] Creating SkillsProvider');
+    logger.info('Creating SkillsProvider');
     const skillsProvider = new SkillsProvider(context.globalState, outputChannel);
 
     const dragMimeType = 'application/vnd.agentskills.node';
@@ -262,7 +229,7 @@ export function activate(context: vscode.ExtensionContext) {
                     offset = 0;
                     updateTitle();
                     updateButtons();
-                    console.warn(`Remote search failed: ${e}`);
+                    logger.warn(`Remote search failed: ${e}`);
                 } finally {
                     if (requestId === activeRequest) quickPick.busy = false;
                 }
@@ -739,7 +706,7 @@ async function fetchRemoteSkills(q: string, limit: number, offset: number): Prom
         } catch (e) {
             lastError = e;
             if (attempt < 3) {
-                console.debug(`Remote search retry ${attempt}/2: ${e}`);
+                logger.debug(`Remote search retry ${attempt}/2: ${e}`);
                 await sleep(attempt === 1 ? 200 : 500);
                 continue;
             }
