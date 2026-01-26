@@ -8,6 +8,7 @@ import { detectIde, getProjectSkillsDir } from './utils/ide';
 import { getCachedSkillHash, clearHashCache } from './utils/skillCompare';
 import { getSkillDirectories } from './utils/skills';
 import { extractYamlField } from './utils/yaml';
+import { getLogger, Logger } from './utils/logger';
 
 // Union type for all tree node types
 type TreeNode = SkillRepo | Skill | LocalSkillsGroup | LocalSkill;
@@ -48,11 +49,13 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     private localGroupByPath: Map<string, LocalSkillsGroup> = new Map();
     private repoByUrl: Map<string, SkillRepo> = new Map();
     private lastRootNodes: TreeNode[] = [];
+    private readonly logger: Logger;
 
     constructor(
         private readonly memento?: vscode.Memento,
-        private readonly outputChannel?: vscode.OutputChannel
+        _outputChannel?: vscode.OutputChannel
     ) {
+        this.logger = getLogger('SkillsProvider');
         this.log('SkillsProvider initialized');
         this.repoOrder = this.memento?.get<string[]>('agentskills.repoOrder') ?? [];
         this.localGroupOrder = this.memento?.get<string[]>('agentskills.localGroupOrder') ?? [];
@@ -710,13 +713,11 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     }
 
     private log(message: string): void {
-        this.outputChannel?.appendLine(`[INFO] ${message}`);
-        console.log(message);
+        this.logger.info(message);
     }
 
     private warn(message: string): void {
-        this.outputChannel?.appendLine(`[WARN] ${message}`);
-        console.warn(message);
+        this.logger.warn(message);
     }
 
     private async getRootNodes(): Promise<TreeNode[]> {

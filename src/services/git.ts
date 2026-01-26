@@ -5,8 +5,10 @@ import * as os from 'os';
 import * as dns from 'dns';
 import { Skill } from '../types';
 import { scanSkillsFromDir, getRepoCachePath } from './skillScanner';
+import { getLogger } from '../utils/logger';
 
 const CACHE_DIR = path.join(os.tmpdir(), 'agentskills-git-cache');
+const logger = getLogger('GitService');
 
 // Ensure cache directory exists
 if (!fs.existsSync(CACHE_DIR)) {
@@ -42,7 +44,7 @@ export class GitService {
                     return parts[1].replace('refs/heads/', '');
                 });
         } catch (e) {
-            console.error(`Failed to list branches for ${url}`, e);
+            logger.error(`Failed to list branches for ${url}`, e);
             return [];
         }
     }
