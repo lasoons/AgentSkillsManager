@@ -22,6 +22,57 @@
         "configuration": {
             "title": "Agent Skills Manager",
             "properties": {
+                "agentskills.extraGlobalSkillsDirectories": {
+                    "type": "array",
+                    "default": [],
+                    "description": "Additional global skills directories to scan for installed skills.",
+                    "items": {
+                        "type": "string"
+                    },
+                    "order": 1
+                },
+                "agentskills.antigravity.globalSkillsDirectory": {
+                    "type": "string",
+                    "default": "~/.gemini/config/skills",
+                    "description": "Global skills directory for Antigravity.",
+                    "order": 2
+                },
+                "agentskills.codebuddy.globalSkillsDirectory": {
+                    "type": "string",
+                    "default": "~/.codebuddy/skills",
+                    "description": "Global skills directory for CodeBuddy.",
+                    "order": 3
+                },
+                "agentskills.cursor.globalSkillsDirectory": {
+                    "type": "string",
+                    "default": "~/.cursor/skills",
+                    "description": "Global skills directory for Cursor.",
+                    "order": 4
+                },
+                "agentskills.qoder.globalSkillsDirectory": {
+                    "type": "string",
+                    "default": "~/.qoder/skills",
+                    "description": "Global skills directory for Qoder.",
+                    "order": 5
+                },
+                "agentskills.trae.globalSkillsDirectory": {
+                    "type": "string",
+                    "default": "~/.trae/skills",
+                    "description": "Global skills directory for Trae.",
+                    "order": 6
+                },
+                "agentskills.vscode.globalSkillsDirectory": {
+                    "type": "string",
+                    "default": "~/.claude/skills",
+                    "description": "Global skills directory for VS Code / Claude Code.",
+                    "order": 7
+                },
+                "agentskills.windsurf.globalSkillsDirectory": {
+                    "type": "string",
+                    "default": "~/.windsurf/skills",
+                    "description": "Global skills directory for Windsurf.",
+                    "order": 8
+                },
                 "agentskills.repositories": {
                     "type": "array",
                     "default": [],
@@ -39,7 +90,8 @@
                                 "type": "string"
                             }
                         }
-                    }
+                    },
+                    "order": 9
                 }
             }
         },
@@ -123,6 +175,11 @@
                 "command": "agentskills.installPersonalSkill",
                 "title": "Install Skill",
                 "icon": "$(cloud-download)"
+            },
+            {
+                "command": "agentskills.openSettings",
+                "title": "Open Settings",
+                "icon": "$(gear)"
             }
         ],
         "viewsContainers": {
@@ -173,6 +230,11 @@
                     "command": "agentskills.refresh",
                     "when": "view == agentskills-skills",
                     "group": "navigation@5"
+                },
+                {
+                    "command": "agentskills.openSettings",
+                    "when": "view == agentskills-skills",
+                    "group": "navigation@6"
                 }
             ],
             "view/item/context": [

@@ -1,4 +1,6 @@
 import { join } from 'path';
+import * as os from 'os';
+import * as vscode from 'vscode';
 
 export enum IdeType {
     VSCODE = 'vscode',
@@ -96,3 +98,54 @@ export function getProjectSkillsDir(workspaceRoot: string, ide: IdeType | string
     const config = getIdeConfig(ide);
     return join(workspaceRoot, config.skillsDir);
 }
+
+export function resolvePath(p: string): string {
+    if (!p) return p;
+
+    // Resolve home directory shortcut ~
+    if (p.startsWith('~')) {
+        p = join(os.homedir(), p.slice(1));
+    }
+
+    // Resolve environmental variables (e.g. %USERPROFILE% on Windows or $HOME on Unix)
+    p = p.replace(/%([^%]+)%/g, (_, name) => process.env[name] || '');
+    p = p.replace(/\$([A-Za-z0-9_]+)/g, (_, name) => process.env[name] || '');
+
+    return p;
+}
+
+export function getGlobalSkillsDir(ide: IdeType | string): string {
+    const ideType = Object.values(IdeType).includes(ide as IdeType)
+        ? ide as IdeType
+        : resolveIdeType(ide);
+
+    try {
+        const config = vscode.workspace.getConfiguration('agentskills');
+        const customDir = config.get<string>(`${ideType}.globalSkillsDirectory`);
+        if (customDir) {
+            return resolvePath(customDir);
+        }
+    } catch (e) {
+        // Fallback
+    }
+
+    const homedir = os.homedir();
+    switch (ideType) {
+        case IdeType.ANTIGRAVITY:
+            return join(homedir, '.gemini', 'config', 'skills');
+        case IdeType.CURSOR:
+            return join(homedir, '.cursor', 'skills');
+        case IdeType.TRAE:
+            return join(homedir, '.trae', 'skills');
+        case IdeType.WINDSURF:
+            return join(homedir, '.windsurf', 'skills');
+        case IdeType.QODER:
+            return join(homedir, '.qoder', 'skills');
+        case IdeType.CODEBUDDY:
+            return join(homedir, '.codebuddy', 'skills');
+        case IdeType.VSCODE:
+        default:
+            return join(homedir, '.claude', 'skills');
+    }
+}
+

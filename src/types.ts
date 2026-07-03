@@ -15,6 +15,8 @@ export interface Skill {
     localPath?: string; // If locally cloned
     installed?: boolean; // Whether installed in current workspace
     matchStatus?: SkillMatchStatus; // Match status with installed version
+    installedGlobally?: boolean; // Whether installed globally
+    globalMatchStatus?: SkillMatchStatus; // Match status with global version
 }
 
 export interface SkillRepo {

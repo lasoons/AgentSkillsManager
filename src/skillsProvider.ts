@@ -4,7 +4,7 @@ import * as path from 'path';
 import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
 import { Skill, SkillRepo, SkillMatchStatus, LocalSkillsGroup, LocalSkill } from './types';
-import { detectIde, getProjectSkillsDir } from './utils/ide';
+import { detectIde, getProjectSkillsDir, getGlobalSkillsDir } from './utils/ide';
 import { getCachedSkillHash, clearHashCache } from './utils/skillCompare';
 import { getSkillDirectories } from './utils/skills';
 import { extractYamlField } from './utils/yaml';
@@ -38,6 +38,7 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
     private checkedSkills: Set<string> = new Set();
     private skillCache: Map<string, Skill> = new Map();
     private installedSkillHashes: Map<string, string> = new Map(); // skillName -> hash
+    private installedGlobalSkillHashes: Map<string, string> = new Map(); // skillName -> hash
     private repoSkillsIndex: Map<string, Skill[]> = new Map();
     private localSkillsIndex: Map<string, LocalSkill[]> = new Map();
     private repoConnectivity: Map<string, { ok: boolean; checkedAt: number }> = new Map();
@@ -284,34 +285,78 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         return root ? getProjectSkillsDir(root, detectIde(process.env, vscode.env.appName)) : undefined;
     }
 
+    private getGlobalSkillsDir(): string | undefined {
+        return getGlobalSkillsDir(detectIde(process.env, vscode.env.appName));
+    }
+
     private isSkillInstalled(skillName: string): boolean {
         const dir = this.getInstalledSkillsDir();
         return dir ? fs.existsSync(path.join(dir, skillName, 'SKILL.md')) : false;
     }
 
+    private isSkillInstalledGlobally(skillName: string): boolean {
+        const dir = this.getGlobalSkillsDir();
+        return dir ? fs.existsSync(path.join(dir, skillName, 'SKILL.md')) : false;
+    }
+
     private updateInstalledSkillHashes(): void {
         this.installedSkillHashes.clear();
-        const dir = this.getInstalledSkillsDir();
-        if (!dir || !fs.existsSync(dir)) return;
+        this.installedGlobalSkillHashes.clear();
 
-        try {
-            const entries = fs.readdirSync(dir, { withFileTypes: true });
-            for (const entry of entries) {
-                if (entry.isDirectory() && !entry.name.startsWith('.')) {
-                    const skillDir = path.join(dir, entry.name);
-                    if (fs.existsSync(path.join(skillDir, 'SKILL.md'))) {
-                        const hash = getCachedSkillHash(skillDir);
-                        this.installedSkillHashes.set(entry.name, hash);
+        const localDir = this.getInstalledSkillsDir();
+        if (localDir && fs.existsSync(localDir)) {
+            try {
+                const entries = fs.readdirSync(localDir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.isDirectory() && !entry.name.startsWith('.')) {
+                        const skillDir = path.join(localDir, entry.name);
+                        if (fs.existsSync(path.join(skillDir, 'SKILL.md'))) {
+                            const hash = getCachedSkillHash(skillDir);
+                            this.installedSkillHashes.set(entry.name, hash);
+                        }
                     }
                 }
+            } catch (e) {
+                console.error('Error updating local installed skill hashes:', e);
             }
-        } catch (e) {
-            console.error('Error updating installed skill hashes:', e);
+        }
+
+        const globalDir = this.getGlobalSkillsDir();
+        if (globalDir && fs.existsSync(globalDir)) {
+            try {
+                const entries = fs.readdirSync(globalDir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.isDirectory() && !entry.name.startsWith('.')) {
+                        const skillDir = path.join(globalDir, entry.name);
+                        if (fs.existsSync(path.join(skillDir, 'SKILL.md'))) {
+                            const hash = getCachedSkillHash(skillDir);
+                            this.installedGlobalSkillHashes.set(entry.name, hash);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error updating global installed skill hashes:', e);
+            }
         }
     }
 
     private getSkillMatchStatus(skill: Skill): SkillMatchStatus {
         const installedHash = this.installedSkillHashes.get(skill.name);
+        if (!installedHash) {
+            return SkillMatchStatus.NotInstalled;
+        }
+
+        // Compare with repo skill hash
+        if (skill.localPath && fs.existsSync(skill.localPath)) {
+            const repoHash = getCachedSkillHash(skill.localPath);
+            return installedHash === repoHash ? SkillMatchStatus.Matched : SkillMatchStatus.Conflict;
+        }
+
+        return SkillMatchStatus.NotInstalled;
+    }
+
+    private getGlobalSkillMatchStatus(skill: Skill): SkillMatchStatus {
+        const installedHash = this.installedGlobalSkillHashes.get(skill.name);
         if (!installedHash) {
             return SkillMatchStatus.NotInstalled;
         }
@@ -462,31 +507,60 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         // Repo skill
         if (isSkill(element)) {
             const matchStatus = element.matchStatus ?? this.getSkillMatchStatus(element);
+            const globalMatchStatus = element.globalMatchStatus ?? this.getGlobalSkillMatchStatus(element);
             const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.None);
             const key = this.getSkillKey(element);
 
             // Handle conflict state - skill installed from different repo
-            if (matchStatus === SkillMatchStatus.Conflict) {
+            if (matchStatus === SkillMatchStatus.Conflict || globalMatchStatus === SkillMatchStatus.Conflict) {
                 item.contextValue = 'skillConflict';
                 item.description = this.truncateDescription(element.description ?? '');
+                
+                let conflictMsg = '';
+                if (matchStatus === SkillMatchStatus.Conflict) {
+                    conflictMsg += `⚠️ **Conflict (Local)**: This skill is installed locally from another repo/version.\n\n`;
+                }
+                if (globalMatchStatus === SkillMatchStatus.Conflict) {
+                    conflictMsg += `⚠️ **Conflict (Global)**: This skill is installed globally from another repo/version.\n\n`;
+                }
+                
                 item.tooltip = new vscode.MarkdownString(
                     `**${element.name}**\n\n` +
                     `${element.description}\n\n` +
                     `---\n\n` +
-                    `⚠️ **冲突**: 此skill已从其他仓库安装，版本与当前仓库不一致。\n\n` +
-                    `如需安装此版本，请先删除已安装的版本。`
+                    conflictMsg +
+                    `To install this version, please delete the conflicting installed version first.`
                 );
                 item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('disabledForeground'));
-                // No checkbox for conflicting skills
                 return item;
             }
 
             // Normal installed or not installed state
-            const installed = matchStatus === SkillMatchStatus.Matched;
+            const installedLocally = matchStatus === SkillMatchStatus.Matched;
+            const installedGlobally = globalMatchStatus === SkillMatchStatus.Matched;
+            const installed = installedLocally || installedGlobally;
 
             item.contextValue = installed ? 'skillInstalled' : 'skill';
-            item.description = this.truncateDescription(element.description ?? '');
-            item.tooltip = `${element.name}\n${element.description}\n${element.path}`;
+            
+            let statusText = '';
+            if (installedLocally && installedGlobally) {
+                statusText = ' (L&G)';
+            } else if (installedLocally) {
+                statusText = ' (Local)';
+            } else if (installedGlobally) {
+                statusText = ' (Global)';
+            }
+            item.description = this.truncateDescription(element.description ?? '') + statusText;
+            
+            const tooltipParts = [
+                `**${element.name}**`,
+                element.description ?? '',
+                `---\nRelative Path: \`${element.path}\``
+            ];
+            if (installedLocally) tooltipParts.push(`✅ Installed locally in workspace`);
+            if (installedGlobally) tooltipParts.push(`✅ Installed globally for user`);
+            
+            item.tooltip = new vscode.MarkdownString(tooltipParts.join('\n\n'));
 
             let iconName = 'tools';
             if (installed) {
@@ -629,6 +703,8 @@ export class SkillsProvider implements vscode.TreeDataProvider<TreeNode> {
         skills.forEach(s => {
             s.matchStatus = this.getSkillMatchStatus(s);
             s.installed = s.matchStatus === SkillMatchStatus.Matched;
+            s.globalMatchStatus = this.getGlobalSkillMatchStatus(s);
+            s.installedGlobally = s.globalMatchStatus === SkillMatchStatus.Matched;
             this.skillCache.set(this.getSkillKey(s), s);
         });
         return skills;
