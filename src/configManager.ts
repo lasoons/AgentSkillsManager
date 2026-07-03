@@ -62,4 +62,14 @@ export class ConfigManager {
         repos = repos.filter(r => r.url !== url);
         await config.update('repositories', repos, vscode.ConfigurationTarget.Global);
     }
+
+    static getIdeGlobalSkillsDirectory(ide: string): string {
+        const config = vscode.workspace.getConfiguration('agentskills');
+        return config.get<string>(`${ide}.globalSkillsDirectory`) || '';
+    }
+
+    static getExtraGlobalSkillsDirectories(): string[] {
+        const config = vscode.workspace.getConfiguration('agentskills');
+        return config.get<string[]>('extraGlobalSkillsDirectories') || [];
+    }
 }

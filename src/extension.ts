@@ -9,10 +9,76 @@ import { ConfigManager } from './configManager';
 import { GitService } from './services/git';
 import { Skill, SkillRepo, LocalSkill, LocalSkillsGroup } from './types';
 import { copyRecursiveSync } from './utils/fs';
-import { detectIde, getProjectSkillsDir } from './utils/ide';
+import { detectIde, getProjectSkillsDir, getGlobalSkillsDir, IDE_CONFIGS, IdeType } from './utils/ide';
 
 type TreeNode = SkillRepo | Skill | LocalSkillsGroup | LocalSkill;
 let skillsTreeView: vscode.TreeView<TreeNode>;
+
+async function getInstallTargetDir(workspaceRoot: string | undefined, ide: string): Promise<string | undefined> {
+    const localDir = workspaceRoot ? getProjectSkillsDir(workspaceRoot, ide) : undefined;
+    const globalDir = getGlobalSkillsDir(ide);
+
+    if (!localDir) {
+        return globalDir;
+    }
+
+    const items: (vscode.QuickPickItem & { detail: string })[] = [
+        {
+            label: '$(folder) Install Locally',
+            description: `to project-level ${IDE_CONFIGS[ide as IdeType]?.skillsDir || ''}`,
+            detail: localDir
+        },
+        {
+            label: '$(home) Install Globally',
+            description: 'to user-level global directory',
+            detail: globalDir
+        }
+    ];
+
+    const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select install location',
+        ignoreFocusOut: true
+    });
+
+    if (!selected) {
+        return undefined;
+    }
+
+    return selected.detail;
+}
+
+async function getDeleteTargetDirs(
+    workspaceRoot: string | undefined,
+    ide: string,
+    skillName: string
+): Promise<string[] | undefined> {
+    const localBase = workspaceRoot ? getProjectSkillsDir(workspaceRoot, ide) : undefined;
+    const globalBase = getGlobalSkillsDir(ide);
+
+    const localDir = localBase ? path.join(localBase, skillName) : undefined;
+    const globalDir = path.join(globalBase, skillName);
+
+    const existsLocally = localDir && fs.existsSync(localDir);
+    const existsGlobally = fs.existsSync(globalDir);
+
+    if (existsLocally && existsGlobally) {
+        const items = [
+            { label: '$(folder) Delete Locally', detail: 'Remove from project directory only', dirs: [localDir!] },
+            { label: '$(home) Delete Globally', detail: 'Remove from global user directory only', dirs: [globalDir] },
+            { label: '$(trash) Delete From Both', detail: 'Remove from both locations', dirs: [localDir!, globalDir] }
+        ];
+        const selected = await vscode.window.showQuickPick(items, {
+            placeHolder: `Skill "${skillName}" is installed in multiple locations. Select which to delete:`,
+            ignoreFocusOut: true
+        });
+        return selected?.dirs;
+    } else if (existsLocally) {
+        return [localDir!];
+    } else if (existsGlobally) {
+        return [globalDir];
+    }
+    return [];
+}
 
 interface RemoteSkill {
     id: string;
@@ -217,16 +283,28 @@ export function activate(context: vscode.ExtensionContext) {
 
             const makeItem = (skill: RemoteSkill, targetBase: string | undefined): RemoteSkillPickItem => {
                 const safeName = sanitizeDirName(skill.name);
-                const installed = Boolean(targetBase && fs.existsSync(path.join(targetBase, safeName)));
+                const globalTargetBase = getGlobalSkillsDir(detectIde(process.env, vscode.env.appName));
+                const installedLocally = Boolean(targetBase && fs.existsSync(path.join(targetBase, safeName)));
+                const installedGlobally = Boolean(globalTargetBase && fs.existsSync(path.join(globalTargetBase, safeName)));
+                const installed = installedLocally || installedGlobally;
                 const installsText = formatCompactNumber(skill.installs);
                 const starsText = formatCompactNumber(skill.stars);
+
+                let installStatus = '';
+                if (installedLocally && installedGlobally) {
+                    installStatus = ' [L & G]';
+                } else if (installedLocally) {
+                    installStatus = ' [Local]';
+                } else if (installedGlobally) {
+                    installStatus = ' [Global]';
+                }
 
                 return {
                     itemType: 'remoteSkill',
                     skill,
                     installed,
                     label: skill.name,
-                    description: `${starsText} ★  ${installsText} ⬇`,
+                    description: `${starsText} ★  ${installsText} ⬇${installStatus}`,
                     detail: [skill.namespace, skill.author ? `by ${skill.author}` : '', skill.description].filter(Boolean).join(' — '),
                     buttons: installed ? [] : [installButton]
                 };
@@ -301,8 +379,10 @@ export function activate(context: vscode.ExtensionContext) {
                 if (e.button !== installButton) return;
 
                 const item = e.item;
-                if (!vscode.workspace.workspaceFolders?.[0]) {
-                    vscode.window.showErrorMessage('Please open a workspace folder first.');
+                const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                const ide = detectIde(process.env, vscode.env.appName);
+                const targetBase = await getInstallTargetDir(workspaceRoot, ide);
+                if (!targetBase) {
                     return;
                 }
 
@@ -311,7 +391,7 @@ export function activate(context: vscode.ExtensionContext) {
                     title: `Installing ${item.skill.name}...`,
                     cancellable: false
                 }, async () => {
-                    await installRemoteSkillFromZip(item.skill, getTargetBase()!);
+                    await installRemoteSkillFromZip(item.skill, targetBase);
                 });
 
                 skillsProvider.refreshInstalledAndLocal();
@@ -322,8 +402,10 @@ export function activate(context: vscode.ExtensionContext) {
             quickPick.onDidAccept(async () => {
                 const selected = (quickPick.selectedItems[0] ?? quickPick.activeItems[0]) as RemoteSkillPickItem | undefined;
                 if (selected?.itemType === 'remoteSkill') {
-                    if (!vscode.workspace.workspaceFolders?.[0]) {
-                        vscode.window.showErrorMessage('Please open a workspace folder first.');
+                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                    const ide = detectIde(process.env, vscode.env.appName);
+                    const targetBase = await getInstallTargetDir(workspaceRoot, ide);
+                    if (!targetBase) {
                         return;
                     }
 
@@ -332,7 +414,7 @@ export function activate(context: vscode.ExtensionContext) {
                         title: `Installing ${selected.skill.name}...`,
                         cancellable: false
                     }, async () => {
-                        await installRemoteSkillFromZip(selected.skill, getTargetBase()!);
+                        await installRemoteSkillFromZip(selected.skill, targetBase);
                     });
 
                     skillsProvider.refreshInstalledAndLocal();
@@ -370,6 +452,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('agentskills.clearSearch', () => {
             skillsProvider.setSearchQuery('');
             void vscode.commands.executeCommand('workbench.actions.treeView.agentskills-skills.collapseAll');
+        }),
+        vscode.commands.registerCommand('agentskills.openSettings', () => {
+            void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:whyuds.agent-skills-manager');
         }),
         vscode.commands.registerCommand('agentskills.selectAllInRepo', async (node: SkillRepo) => {
             if (!node || !('url' in node)) return;
@@ -454,8 +539,10 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            if (!vscode.workspace.workspaceFolders) {
-                vscode.window.showErrorMessage('Please open a workspace folder first.');
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const ide = detectIde(process.env, vscode.env.appName);
+            const targetBase = await getInstallTargetDir(workspaceRoot, ide);
+            if (!targetBase) {
                 return;
             }
 
@@ -464,9 +551,6 @@ export function activate(context: vscode.ExtensionContext) {
                 title: `Installing ${selected.length} skill(s)...`,
                 cancellable: false
             }, async (progress) => {
-                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-                const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
-
                 for (let i = 0; i < selected.length; i++) {
                     const skill = selected[i];
                     progress.report({ message: `${skill.name} (${i + 1}/${selected.length})` });
@@ -499,25 +583,40 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            if (!vscode.workspace.workspaceFolders) {
-                vscode.window.showErrorMessage('Please open a workspace folder first.');
-                return;
-            }
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const ide = detectIde(process.env, vscode.env.appName);
 
-            const confirm = await vscode.window.showWarningMessage(
-                `Delete ${selected.length} skill(s) from this project?`,
-                'Yes', 'No'
-            );
+            const items = [
+                { label: 'Locally', description: 'from project directory' },
+                { label: 'Globally', description: 'from user directory' },
+                { label: 'Both', description: 'from both project and user directories' }
+            ];
 
-            if (confirm !== 'Yes') return;
+            const choice = await vscode.window.showQuickPick(items, {
+                placeHolder: `Delete ${selected.length} skill(s) from:`,
+                ignoreFocusOut: true
+            });
 
-            const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-            const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
+            if (!choice) return;
+
+            const deleteLocal = choice.label === 'Locally' || choice.label === 'Both';
+            const deleteGlobal = choice.label === 'Globally' || choice.label === 'Both';
+
+            const localBase = workspaceRoot ? getProjectSkillsDir(workspaceRoot, ide) : undefined;
+            const globalBase = getGlobalSkillsDir(ide);
 
             for (const skill of selected) {
-                const targetDir = path.join(targetBase, skill.name);
-                if (fs.existsSync(targetDir)) {
-                    fs.rmSync(targetDir, { recursive: true, force: true });
+                if (deleteLocal && localBase) {
+                    const localDir = path.join(localBase, skill.name);
+                    if (fs.existsSync(localDir)) {
+                        fs.rmSync(localDir, { recursive: true, force: true });
+                    }
+                }
+                if (deleteGlobal) {
+                    const globalDir = path.join(globalBase, skill.name);
+                    if (fs.existsSync(globalDir)) {
+                        fs.rmSync(globalDir, { recursive: true, force: true });
+                    }
                 }
             }
 
@@ -532,8 +631,10 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            if (!vscode.workspace.workspaceFolders) {
-                vscode.window.showErrorMessage('Please open a workspace folder first.');
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const ide = detectIde(process.env, vscode.env.appName);
+            const targetBase = await getInstallTargetDir(workspaceRoot, ide);
+            if (!targetBase) {
                 return;
             }
 
@@ -542,8 +643,6 @@ export function activate(context: vscode.ExtensionContext) {
                 title: `Installing ${node.name}...`,
                 cancellable: false
             }, async () => {
-                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-                const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
                 const targetDir = path.join(targetBase, node.name);
 
                 if (!node.localPath || !fs.existsSync(node.localPath)) {
@@ -566,17 +665,16 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            if (!vscode.workspace.workspaceFolders) {
-                vscode.window.showErrorMessage('Please open a workspace folder first.');
-                return;
-            }
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const ide = detectIde(process.env, vscode.env.appName);
+            const targetDirs = await getDeleteTargetDirs(workspaceRoot, ide, node.name);
+            
+            if (!targetDirs || targetDirs.length === 0) return;
 
-            const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-            const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
-            const targetDir = path.join(targetBase, node.name);
-
-            if (fs.existsSync(targetDir)) {
-                fs.rmSync(targetDir, { recursive: true, force: true });
+            for (const targetDir of targetDirs) {
+                if (fs.existsSync(targetDir)) {
+                    fs.rmSync(targetDir, { recursive: true, force: true });
+                }
             }
 
             skillsProvider.clearSelection();
@@ -618,8 +716,10 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            if (!vscode.workspace.workspaceFolders) {
-                vscode.window.showErrorMessage('Please open a workspace folder first.');
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const ide = detectIde(process.env, vscode.env.appName);
+            const targetBase = await getInstallTargetDir(workspaceRoot, ide);
+            if (!targetBase) {
                 return;
             }
 
@@ -628,8 +728,6 @@ export function activate(context: vscode.ExtensionContext) {
                 title: `Installing ${node.name}...`,
                 cancellable: false
             }, async () => {
-                const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
-                const targetBase = getProjectSkillsDir(workspaceRoot, detectIde(process.env, vscode.env.appName));
                 const targetDir = path.join(targetBase, node.name);
 
                 if (!fs.existsSync(node.path)) {
